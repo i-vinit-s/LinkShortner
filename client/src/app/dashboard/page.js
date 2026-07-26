@@ -5,6 +5,7 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 import Navbar from "@/components/Navbar";
 import CreateLinkForm from "@/components/CreateLinkForm";
 import LinkCard from "@/components/LinkCard";
+import LinkFilterBar from "@/components/LinkFilterBar";
 import api from "@/lib/api";
 
 function DashboardContent() {
@@ -12,6 +13,10 @@ function DashboardContent() {
   var [loading, setLoading] = useState(true);
   var [selectedIds, setSelectedIds] = useState([]);
   var [bulkLoading, setBulkLoading] = useState(false);
+
+  var [search, setSearch] = useState("");
+  var [statusFilter, setStatusFilter] = useState("all");
+  var [sortBy, setSortBy] = useState("newest");
 
   useEffect(function () {
     var loadLinks = async function () {
@@ -97,6 +102,61 @@ function DashboardContent() {
     }
   };
 
+  var getFilteredLinks = function () {
+    var result = links.slice(); // copy, don't mutate original
+
+    // Search: match against long URL or short code, case-insensitive
+    if (search.trim() !== "") {
+      var query = search.trim().toLowerCase();
+      result = result.filter(function (link) {
+        return (
+          link.longUrl.toLowerCase().indexOf(query) !== -1 ||
+          link.shortCode.toLowerCase().indexOf(query) !== -1
+        );
+      });
+    }
+
+    // Status filter
+    if (statusFilter === "active") {
+      result = result.filter(function (link) {
+        var expired = link.expiresAt && new Date(link.expiresAt) < new Date();
+        return link.isActive && !expired;
+      });
+    } else if (statusFilter === "expired") {
+      result = result.filter(function (link) {
+        var expired = link.expiresAt && new Date(link.expiresAt) < new Date();
+        return !link.isActive || expired;
+      });
+    } else if (statusFilter === "password") {
+      result = result.filter(function (link) {
+        return !!link.passwordHash;
+      });
+    }
+
+    // Sort
+    if (sortBy === "newest") {
+      result.sort(function (a, b) {
+        return new Date(b.createdAt) - new Date(a.createdAt);
+      });
+    } else if (sortBy === "oldest") {
+      result.sort(function (a, b) {
+        return new Date(a.createdAt) - new Date(b.createdAt);
+      });
+    } else if (sortBy === "most-clicks") {
+      result.sort(function (a, b) {
+        return b.clickCount - a.clickCount;
+      });
+    } else if (sortBy === "least-clicks") {
+      result.sort(function (a, b) {
+        return a.clickCount - b.clickCount;
+      });
+    }
+
+    return result;
+  };
+
+  var filteredLinks = getFilteredLinks();
+
   return (
     <div className="min-h-screen bg-ink">
       <Navbar />
@@ -127,9 +187,20 @@ function DashboardContent() {
                 <input
                   type="checkbox"
                   checked={
-                    selectedIds.length === links.length && links.length > 0
+                    selectedIds.length === filteredLinks.length &&
+                    filteredLinks.length > 0
                   }
-                  onChange={toggleSelectAll}
+                  onChange={function () {
+                    if (selectedIds.length === filteredLinks.length) {
+                      setSelectedIds([]);
+                    } else {
+                      setSelectedIds(
+                        filteredLinks.map(function (l) {
+                          return l._id;
+                        }),
+                      );
+                    }
+                  }}
                   className="accent-signal w-4 h-4"
                 />
                 {selectedIds.length > 0
@@ -148,18 +219,35 @@ function DashboardContent() {
               ) : null}
             </div>
 
+            <LinkFilterBar
+              search={search}
+              setSearch={setSearch}
+              statusFilter={statusFilter}
+              setStatusFilter={setStatusFilter}
+              sortBy={sortBy}
+              setSortBy={setSortBy}
+            />
+
             <div className="space-y-3">
-              {links.map(function (link) {
-                return (
-                  <LinkCard
-                    key={link._id}
-                    link={link}
-                    onDelete={handleDelete}
-                    selected={selectedIds.indexOf(link._id) !== -1}
-                    onToggleSelect={toggleSelect}
-                  />
-                );
-              })}
+              {filteredLinks.length === 0 ? (
+                <div className="border border-dashed border-white/15 rounded-lg p-8 text-center">
+                  <p className="text-text-muted text-sm">
+                    No links match your search or filters.
+                  </p>
+                </div>
+              ) : (
+                filteredLinks.map(function (link) {
+                  return (
+                    <LinkCard
+                      key={link._id}
+                      link={link}
+                      onDelete={handleDelete}
+                      selected={selectedIds.indexOf(link._id) !== -1}
+                      onToggleSelect={toggleSelect}
+                    />
+                  );
+                })
+              )}
             </div>
           </>
         )}
