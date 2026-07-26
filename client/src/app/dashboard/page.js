@@ -73,18 +73,6 @@ function DashboardContent() {
     });
   };
 
-  var toggleSelectAll = function () {
-    if (selectedIds.length === links.length) {
-      setSelectedIds([]);
-    } else {
-      setSelectedIds(
-        links.map(function (l) {
-          return l._id;
-        }),
-      );
-    }
-  };
-
   var handleBulkDelete = async function () {
     if (selectedIds.length === 0) return;
     if (!confirm("Deactivate " + selectedIds.length + " selected link(s)?"))
@@ -108,9 +96,8 @@ function DashboardContent() {
   };
 
   var getFilteredLinks = function () {
-    var result = links.slice(); // copy, don't mutate original
+    var result = links.slice();
 
-    // Search: match against long URL or short code, case-insensitive
     if (search.trim() !== "") {
       var query = search.trim().toLowerCase();
       result = result.filter(function (link) {
@@ -121,7 +108,6 @@ function DashboardContent() {
       });
     }
 
-    // Status filter
     if (statusFilter === "active") {
       result = result.filter(function (link) {
         var expired = link.expiresAt && new Date(link.expiresAt) < new Date();
@@ -144,7 +130,6 @@ function DashboardContent() {
       });
     }
 
-    // Sort
     if (sortBy === "newest") {
       result.sort(function (a, b) {
         return new Date(b.createdAt) - new Date(a.createdAt);
@@ -167,16 +152,30 @@ function DashboardContent() {
   };
 
   var filteredLinks = getFilteredLinks();
+  var allSelected =
+    selectedIds.length === filteredLinks.length && filteredLinks.length > 0;
+
+  var toggleSelectAllFiltered = function () {
+    if (allSelected) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(
+        filteredLinks.map(function (l) {
+          return l._id;
+        }),
+      );
+    }
+  };
 
   return (
     <div className="min-h-screen bg-ink">
       <Navbar />
-      <div className="max-w-3xl mx-auto px-4 py-10 space-y-6">
+      <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 sm:py-10 space-y-5 sm:space-y-6 pb-28 sm:pb-10">
         <div>
           <p className="text-xs uppercase tracking-widest text-wire font-mono mb-1">
             Dashboard
           </p>
-          <h1 className="text-2xl font-display font-bold text-white">
+          <h1 className="text-xl sm:text-2xl font-display font-bold text-white">
             Your links
           </h1>
         </div>
@@ -184,7 +183,11 @@ function DashboardContent() {
         <CreateLinkForm onCreated={handleCreated} />
 
         {loading ? (
-          <p className="text-text-muted text-sm">Loading links...</p>
+          <div className="space-y-3 animate-pulse">
+            <div className="h-16 bg-surface rounded-lg" />
+            <div className="h-16 bg-surface rounded-lg" />
+            <div className="h-16 bg-surface rounded-lg" />
+          </div>
         ) : links.length === 0 ? (
           <div className="border border-dashed border-white/15 rounded-lg p-8 text-center">
             <p className="text-text-muted text-sm">
@@ -193,43 +196,6 @@ function DashboardContent() {
           </div>
         ) : (
           <>
-            <div className="flex items-center justify-between">
-              <label className="flex items-center gap-2 text-sm text-text-muted cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={
-                    selectedIds.length === filteredLinks.length &&
-                    filteredLinks.length > 0
-                  }
-                  onChange={function () {
-                    if (selectedIds.length === filteredLinks.length) {
-                      setSelectedIds([]);
-                    } else {
-                      setSelectedIds(
-                        filteredLinks.map(function (l) {
-                          return l._id;
-                        }),
-                      );
-                    }
-                  }}
-                  className="accent-signal w-4 h-4"
-                />
-                {selectedIds.length > 0
-                  ? selectedIds.length + " selected"
-                  : "Select all"}
-              </label>
-
-              {selectedIds.length > 0 ? (
-                <button
-                  onClick={handleBulkDelete}
-                  disabled={bulkLoading}
-                  className="text-sm border border-danger/30 text-danger rounded-md px-3 py-1.5 hover:bg-danger/10 transition-colors disabled:opacity-50"
-                >
-                  {bulkLoading ? "Deactivating..." : "Deactivate selected"}
-                </button>
-              ) : null}
-            </div>
-
             <LinkFilterBar
               search={search}
               setSearch={setSearch}
@@ -241,6 +207,33 @@ function DashboardContent() {
               tagFilter={tagFilter}
               setTagFilter={setTagFilter}
             />
+
+            <div className="flex items-center justify-between gap-3">
+              <label className="flex items-center gap-2 text-sm text-text-muted cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={allSelected}
+                  onChange={toggleSelectAllFiltered}
+                  className="accent-signal w-4 h-4 shrink-0"
+                />
+                <span>
+                  {selectedIds.length > 0
+                    ? selectedIds.length + " selected"
+                    : "Select all (" + filteredLinks.length + ")"}
+                </span>
+              </label>
+
+              {/* Desktop bulk-delete button — hidden on mobile, replaced by the sticky bar below */}
+              {selectedIds.length > 0 ? (
+                <button
+                  onClick={handleBulkDelete}
+                  disabled={bulkLoading}
+                  className="hidden sm:inline-flex text-sm border border-danger/30 text-danger rounded-md px-3 py-1.5 hover:bg-danger/10 transition-colors disabled:opacity-50 shrink-0"
+                >
+                  {bulkLoading ? "Deactivating..." : "Deactivate selected"}
+                </button>
+              ) : null}
+            </div>
 
             <div className="space-y-3">
               {filteredLinks.length === 0 ? (
@@ -266,6 +259,32 @@ function DashboardContent() {
           </>
         )}
       </div>
+
+      {/* Mobile-only sticky bulk-action bar — appears at the thumb-reachable bottom of the screen */}
+      {selectedIds.length > 0 ? (
+        <div className="sm:hidden fixed bottom-0 left-0 right-0 bg-surface border-t border-white/10 px-4 py-3 flex items-center justify-between z-40">
+          <span className="text-sm text-text-muted">
+            {selectedIds.length} selected
+          </span>
+          <div className="flex gap-2">
+            <button
+              onClick={function () {
+                setSelectedIds([]);
+              }}
+              className="text-sm border border-white/15 rounded-md px-3 py-1.5 text-text-muted"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleBulkDelete}
+              disabled={bulkLoading}
+              className="text-sm border border-danger/30 text-danger rounded-md px-3 py-1.5 disabled:opacity-50"
+            >
+              {bulkLoading ? "..." : "Deactivate"}
+            </button>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -65,7 +65,7 @@ export default function LinkCard(props) {
   return (
     <div
       className={
-        "border rounded-lg p-4 flex justify-between items-center gap-4 transition-colors " +
+        "border rounded-lg p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 transition-colors " +
         (selected
           ? "border-signal bg-surface-raised"
           : "border-white/10 bg-surface")
@@ -116,7 +116,7 @@ export default function LinkCard(props) {
         </div>
       </div>
 
-      <div className="flex items-center gap-2 shrink-0">
+      <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap shrink-0 justify-end sm:justify-normal w-full sm:w-auto">
         <button
           onClick={handleCopy}
           className="text-sm border border-white/15 rounded-md px-3 py-1.5 text-text-muted hover:text-white hover:border-white/30 transition-colors"

@@ -11,24 +11,34 @@ export default function LinkFilterBar(props) {
   var tagFilter = props.tagFilter;
   var setTagFilter = props.setTagFilter;
 
+  var selectClass =
+    "w-full bg-surface-raised border border-white/10 rounded-md px-3 py-2 text-sm text-white focus:outline-none focus:border-signal";
+
   return (
-    <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
+    <div className="space-y-2">
       <input
         value={search}
         onChange={function (e) {
           setSearch(e.target.value);
         }}
         placeholder="Search by URL or short code..."
-        className="bg-surface-raised border border-white/10 rounded-md px-3 py-2 text-sm text-white placeholder:text-text-muted focus:outline-none focus:border-signal w-full sm:w-64"
+        className="w-full bg-surface-raised border border-white/10 rounded-md px-3 py-2 text-sm text-white placeholder:text-text-muted focus:outline-none focus:border-signal"
       />
 
-      <div className="flex gap-2 shrink-0 flex-wrap">
+      <div
+        className={
+          "grid gap-2 " +
+          (availableTags.length > 0
+            ? "grid-cols-2 sm:grid-cols-3"
+            : "grid-cols-2")
+        }
+      >
         <select
           value={statusFilter}
           onChange={function (e) {
             setStatusFilter(e.target.value);
           }}
-          className="bg-surface-raised border border-white/10 rounded-md px-3 py-2 text-sm text-white focus:outline-none focus:border-signal"
+          className={selectClass}
         >
           <option value="all">All statuses</option>
           <option value="active">Active</option>
@@ -41,7 +51,7 @@ export default function LinkFilterBar(props) {
           onChange={function (e) {
             setSortBy(e.target.value);
           }}
-          className="bg-surface-raised border border-white/10 rounded-md px-3 py-2 text-sm text-white focus:outline-none focus:border-signal"
+          className={selectClass}
         >
           <option value="newest">Newest first</option>
           <option value="oldest">Oldest first</option>
@@ -55,7 +65,7 @@ export default function LinkFilterBar(props) {
             onChange={function (e) {
               setTagFilter(e.target.value);
             }}
-            className="bg-surface-raised border border-white/10 rounded-md px-3 py-2 text-sm text-white focus:outline-none focus:border-signal"
+            className={selectClass + " col-span-2 sm:col-span-1"}
           >
             <option value="all">All tags</option>
             {availableTags.map(function (tag) {
