@@ -8,24 +8,15 @@ import LinkCard from "@/components/LinkCard";
 import api from "@/lib/api";
 
 function DashboardContent() {
-  const [links, setLinks] = useState([]);
-  const [loading, setLoading] = useState(true);
+  var [links, setLinks] = useState([]);
+  var [loading, setLoading] = useState(true);
+  var [selectedIds, setSelectedIds] = useState([]);
+  var [bulkLoading, setBulkLoading] = useState(false);
 
-  const fetchLinks = async () => {
-    try {
-      const res = await api.get("/links/mine");
-      setLinks(res.data.links);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    const loadLinks = async () => {
+  useEffect(function () {
+    var loadLinks = async function () {
       try {
-        const res = await api.get("/links/mine");
+        var res = await api.get("/links/mine");
         setLinks(res.data.links);
       } catch (err) {
         console.error(err);
@@ -36,17 +27,73 @@ function DashboardContent() {
     loadLinks();
   }, []);
 
-  const handleCreated = (newLink) => {
-    setLinks((prev) => [newLink, ...prev]);
+  var handleCreated = function (newLink) {
+    setLinks(function (prev) {
+      return [newLink].concat(prev);
+    });
   };
 
-  const handleDelete = async (id) => {
+  var handleDelete = async function (id) {
     if (!confirm("Deactivate this link?")) return;
     try {
-      await api.delete(`/links/${id}`);
-      setLinks((prev) => prev.filter((l) => l._id !== id));
+      await api.delete("/links/" + id);
+      setLinks(function (prev) {
+        return prev.filter(function (l) {
+          return l._id !== id;
+        });
+      });
+      setSelectedIds(function (prev) {
+        return prev.filter(function (sid) {
+          return sid !== id;
+        });
+      });
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  var toggleSelect = function (id) {
+    setSelectedIds(function (prev) {
+      if (prev.indexOf(id) === -1) {
+        return prev.concat([id]);
+      }
+      return prev.filter(function (sid) {
+        return sid !== id;
+      });
+    });
+  };
+
+  var toggleSelectAll = function () {
+    if (selectedIds.length === links.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(
+        links.map(function (l) {
+          return l._id;
+        }),
+      );
+    }
+  };
+
+  var handleBulkDelete = async function () {
+    if (selectedIds.length === 0) return;
+    if (!confirm("Deactivate " + selectedIds.length + " selected link(s)?"))
+      return;
+
+    setBulkLoading(true);
+    try {
+      await api.post("/links/bulk-delete", { ids: selectedIds });
+      setLinks(function (prev) {
+        return prev.filter(function (l) {
+          return selectedIds.indexOf(l._id) === -1;
+        });
+      });
+      setSelectedIds([]);
+    } catch (err) {
+      console.error(err);
+      alert("Bulk delete failed");
+    } finally {
+      setBulkLoading(false);
     }
   };
 
@@ -74,13 +121,47 @@ function DashboardContent() {
             </p>
           </div>
         ) : (
-          <div className="space-y-3">
-            {links.map(function (link) {
-              return (
-                <LinkCard key={link._id} link={link} onDelete={handleDelete} />
-              );
-            })}
-          </div>
+          <>
+            <div className="flex items-center justify-between">
+              <label className="flex items-center gap-2 text-sm text-text-muted cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={
+                    selectedIds.length === links.length && links.length > 0
+                  }
+                  onChange={toggleSelectAll}
+                  className="accent-signal w-4 h-4"
+                />
+                {selectedIds.length > 0
+                  ? selectedIds.length + " selected"
+                  : "Select all"}
+              </label>
+
+              {selectedIds.length > 0 ? (
+                <button
+                  onClick={handleBulkDelete}
+                  disabled={bulkLoading}
+                  className="text-sm border border-danger/30 text-danger rounded-md px-3 py-1.5 hover:bg-danger/10 transition-colors disabled:opacity-50"
+                >
+                  {bulkLoading ? "Deactivating..." : "Deactivate selected"}
+                </button>
+              ) : null}
+            </div>
+
+            <div className="space-y-3">
+              {links.map(function (link) {
+                return (
+                  <LinkCard
+                    key={link._id}
+                    link={link}
+                    onDelete={handleDelete}
+                    selected={selectedIds.indexOf(link._id) !== -1}
+                    onToggleSelect={toggleSelect}
+                  />
+                );
+              })}
+            </div>
+          </>
         )}
       </div>
     </div>

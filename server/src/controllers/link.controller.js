@@ -121,3 +121,34 @@ exports.deleteLink = async (req, res) => {
     res.status(500).json({ message: "Failed to delete link" });
   }
 };
+
+exports.bulkDeleteLinks = async (req, res) => {
+  try {
+    var ids = req.body.ids;
+
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ message: "No links selected" });
+    }
+
+    // Scope strictly to this user's own links — never trust IDs alone
+    var result = await Link.updateMany(
+      { _id: { $in: ids }, userId: req.session.userId },
+      { $set: { isActive: false } },
+    );
+
+    // Clear Redis cache for each affected link so deactivation takes effect immediately
+    var links = await Link.find({
+      _id: { $in: ids },
+      userId: req.session.userId,
+    }).select("shortCode");
+    var deletePromises = links.map(function (link) {
+      return redisClient.del("short:" + link.shortCode);
+    });
+    await Promise.all(deletePromises);
+
+    res.json({ message: "Links deactivated", count: result.modifiedCount });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Bulk delete failed" });
+  }
+};

@@ -4,6 +4,7 @@ const {
   createLink,
   getMyLinks,
   deleteLink,
+  bulkDeleteLinks,
 } = require("../controllers/link.controller");
 const { requireAuth } = require("../middleware/auth");
 const {
@@ -22,5 +23,6 @@ const smartLinkLimiter = (req, res, next) => {
 router.post("/", smartLinkLimiter, createLink);
 router.get("/mine", requireAuth, getMyLinks);
 router.delete("/:id", requireAuth, deleteLink);
+router.post("/bulk-delete", requireAuth, bulkDeleteLinks);
 
 module.exports = router;

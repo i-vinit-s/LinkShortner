@@ -23,6 +23,8 @@ function OdometerCount(props) {
 export default function LinkCard(props) {
   var link = props.link;
   var onDelete = props.onDelete;
+  var selected = props.selected;
+  var onToggleSelect = props.onToggleSelect;
 
   var [copied, setCopied] = useState(false);
   var [showQr, setShowQr] = useState(false);
@@ -61,8 +63,23 @@ export default function LinkCard(props) {
   }
 
   return (
-    <div className="border border-white/10 bg-surface rounded-lg p-4 flex justify-between items-center gap-4">
+    <div
+      className={
+        "border rounded-lg p-4 flex justify-between items-center gap-4 transition-colors " +
+        (selected
+          ? "border-signal bg-surface-raised"
+          : "border-white/10 bg-surface")
+      }
+    >
       <div className="min-w-0 flex items-center gap-3">
+        <input
+          type="checkbox"
+          checked={selected}
+          onChange={function () {
+            onToggleSelect(link._id);
+          }}
+          className="accent-signal w-4 h-4 shrink-0"
+        />
         <span className={dotClass} title={dotLabel}></span>
         <div className="min-w-0">
           <div className="flex items-center gap-2">
