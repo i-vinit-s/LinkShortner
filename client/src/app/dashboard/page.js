@@ -18,18 +18,23 @@ function DashboardContent() {
   var [statusFilter, setStatusFilter] = useState("all");
   var [sortBy, setSortBy] = useState("newest");
 
+  var [availableTags, setAvailableTags] = useState([]);
+  var [tagFilter, setTagFilter] = useState("all");
+
   useEffect(function () {
-    var loadLinks = async function () {
+    var loadData = async function () {
       try {
-        var res = await api.get("/links/mine");
-        setLinks(res.data.links);
+        var linksRes = await api.get("/links/mine");
+        setLinks(linksRes.data.links);
+        var tagsRes = await api.get("/links/tags");
+        setAvailableTags(tagsRes.data.tags);
       } catch (err) {
         console.error(err);
       } finally {
         setLoading(false);
       }
     };
-    loadLinks();
+    loadData();
   }, []);
 
   var handleCreated = function (newLink) {
@@ -133,6 +138,12 @@ function DashboardContent() {
       });
     }
 
+    if (tagFilter !== "all") {
+      result = result.filter(function (link) {
+        return link.tags && link.tags.indexOf(tagFilter) !== -1;
+      });
+    }
+
     // Sort
     if (sortBy === "newest") {
       result.sort(function (a, b) {
@@ -226,6 +237,9 @@ function DashboardContent() {
               setStatusFilter={setStatusFilter}
               sortBy={sortBy}
               setSortBy={setSortBy}
+              availableTags={availableTags}
+              tagFilter={tagFilter}
+              setTagFilter={setTagFilter}
             />
 
             <div className="space-y-3">

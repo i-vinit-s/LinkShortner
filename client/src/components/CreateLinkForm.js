@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import api from "@/lib/api";
+import TagInput from "./TagInput";
 
 export default function CreateLinkForm({ onCreated }) {
   const [longUrl, setLongUrl] = useState("");
@@ -11,6 +12,7 @@ export default function CreateLinkForm({ onCreated }) {
   const [expiresAt, setExpiresAt] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  var [tags, setTags] = useState([]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -21,6 +23,7 @@ export default function CreateLinkForm({ onCreated }) {
       if (customAlias) payload.customAlias = customAlias;
       if (password) payload.password = password;
       if (expiresAt) payload.expiresAt = new Date(expiresAt).toISOString();
+      if (tags.length > 0) payload.tags = tags;
 
       const res = await api.post("/links", payload);
       onCreated(res.data.link);
@@ -29,6 +32,7 @@ export default function CreateLinkForm({ onCreated }) {
       setCustomAlias("");
       setPassword("");
       setExpiresAt("");
+      setTags([]);
     } catch (err) {
       if (err.response?.status === 429) {
         setError(
@@ -86,6 +90,7 @@ export default function CreateLinkForm({ onCreated }) {
             onChange={(e) => setExpiresAt(e.target.value)}
             className="bg-surface-raised border border-white/10 rounded-md px-3 py-2 text-sm text-white focus:outline-none focus:border-signal"
           />
+          <TagInput tags={tags} setTags={setTags} />
         </div>
       )}
 

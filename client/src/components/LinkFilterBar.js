@@ -7,6 +7,9 @@ export default function LinkFilterBar(props) {
   var setStatusFilter = props.setStatusFilter;
   var sortBy = props.sortBy;
   var setSortBy = props.setSortBy;
+  var availableTags = props.availableTags || [];
+  var tagFilter = props.tagFilter;
+  var setTagFilter = props.setTagFilter;
 
   return (
     <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
@@ -19,7 +22,7 @@ export default function LinkFilterBar(props) {
         className="bg-surface-raised border border-white/10 rounded-md px-3 py-2 text-sm text-white placeholder:text-text-muted focus:outline-none focus:border-signal w-full sm:w-64"
       />
 
-      <div className="flex gap-2 shrink-0">
+      <div className="flex gap-2 shrink-0 flex-wrap">
         <select
           value={statusFilter}
           onChange={function (e) {
@@ -45,6 +48,25 @@ export default function LinkFilterBar(props) {
           <option value="most-clicks">Most clicks</option>
           <option value="least-clicks">Least clicks</option>
         </select>
+
+        {availableTags.length > 0 ? (
+          <select
+            value={tagFilter}
+            onChange={function (e) {
+              setTagFilter(e.target.value);
+            }}
+            className="bg-surface-raised border border-white/10 rounded-md px-3 py-2 text-sm text-white focus:outline-none focus:border-signal"
+          >
+            <option value="all">All tags</option>
+            {availableTags.map(function (tag) {
+              return (
+                <option key={tag} value={tag}>
+                  {tag}
+                </option>
+              );
+            })}
+          </select>
+        ) : null}
       </div>
     </div>
   );

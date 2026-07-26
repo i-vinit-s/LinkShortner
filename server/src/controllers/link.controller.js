@@ -17,20 +17,35 @@ const RESERVED_ALIASES = [
 
 exports.createLink = async (req, res) => {
   try {
-    const { longUrl, customAlias, expiresAt, password } = req.body;
+    var longUrl = req.body.longUrl;
+    var customAlias = req.body.customAlias;
+    var expiresAt = req.body.expiresAt;
+    var password = req.body.password;
+    var tags = req.body.tags;
 
     if (!longUrl || !validUrl.isWebUri(longUrl)) {
       return res.status(400).json({ message: "A valid URL is required" });
     }
 
+    // Normalize tags: trim, lowercase, dedupe, cap length and count
+    var cleanTags = [];
+    if (Array.isArray(tags)) {
+      var seen = {};
+      for (var i = 0; i < tags.length; i++) {
+        var t = String(tags[i]).trim().toLowerCase().slice(0, 20);
+        if (t !== "" && !seen[t]) {
+          seen[t] = true;
+          cleanTags.push(t);
+        }
+        if (cleanTags.length >= 5) break; // cap at 5 tags per link
+      }
+    }
+
     const malicious = await isUrlMalicious(longUrl);
     if (malicious) {
-      return res
-        .status(400)
-        .json({
-          message:
-            "This URL has been flagged as unsafe and cannot be shortened",
-        });
+      return res.status(400).json({
+        message: "This URL has been flagged as unsafe and cannot be shortened",
+      });
     }
 
     let shortCode;
@@ -55,12 +70,13 @@ exports.createLink = async (req, res) => {
       shortCode = encode(counter);
     }
 
-    const linkData = {
-      shortCode,
-      longUrl,
+    var linkData = {
+      shortCode: shortCode,
+      longUrl: longUrl,
       customAlias: !!customAlias,
       userId: req.session.userId || null,
       expiresAt: expiresAt || null,
+      tags: cleanTags,
     };
 
     if (password) {
@@ -150,5 +166,14 @@ exports.bulkDeleteLinks = async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Bulk delete failed" });
+  }
+};
+
+exports.getMyTags = async (req, res) => {
+  try {
+    var tags = await Link.distinct("tags", { userId: req.session.userId });
+    res.json({ tags: tags.sort() });
+  } catch (err) {
+    res.status(500).json({ message: "Failed to fetch tags" });
   }
 };

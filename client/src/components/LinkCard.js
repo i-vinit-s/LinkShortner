@@ -95,6 +95,20 @@ export default function LinkCard(props) {
           <p className="text-sm text-text-muted truncate max-w-md mt-1">
             {link.longUrl}
           </p>
+          {link.tags && link.tags.length > 0 ? (
+            <div className="flex flex-wrap gap-1 mt-1">
+              {link.tags.map(function (tag) {
+                return (
+                  <span
+                    key={tag}
+                    className="text-xs bg-wire/10 text-wire rounded px-1.5 py-0.5 font-mono"
+                  >
+                    {tag}
+                  </span>
+                );
+              })}
+            </div>
+          ) : null}
           <p className="text-xs text-text-muted/70 mt-1 font-mono">
             <OdometerCount value={link.clickCount} /> clicks -{" "}
             {new Date(link.createdAt).toLocaleDateString()}
