@@ -39,7 +39,15 @@ app.use(
   }),
 );
 
-app.get("/health", (req, res) => res.json({ status: "ok" }));
+app.get("/health", (req, res) => {
+  const mongoose = require("mongoose");
+  res.json({
+    status: "ok",
+    mongo: mongoose.connection.readyState === 1 ? "connected" : "down",
+    redis: redisClient.isReady ? "connected" : "down",
+    timestamp: Date.now(),
+  });
+});
 
 app.use("/api/v1/auth", authRoutes);
 

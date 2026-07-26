@@ -1,5 +1,6 @@
 import { Space_Grotesk, IBM_Plex_Sans, JetBrains_Mono } from "next/font/google";
 import { AuthProvider } from "@/context/AuthContext";
+import LatencyIndicator from "@/components/LatencyIndicator";
 import "./globals.css";
 
 const display = Space_Grotesk({
@@ -31,6 +32,7 @@ export default function RootLayout({ children }) {
     >
       <body>
         <AuthProvider>{children}</AuthProvider>
+        <LatencyIndicator />
       </body>
     </html>
   );
