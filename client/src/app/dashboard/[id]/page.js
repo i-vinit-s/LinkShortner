@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
+import Papa from "papaparse";
 import {
   LineChart,
   Line,
@@ -95,6 +96,7 @@ function AnalyticsContent() {
   var [data, setData] = useState(null);
   var [loading, setLoading] = useState(true);
   var [error, setError] = useState("");
+  var [exporting, setExporting] = useState(false);
 
   useEffect(
     function () {
@@ -112,6 +114,46 @@ function AnalyticsContent() {
     },
     [params.id],
   );
+
+  var handleExportCsv = async function () {
+    setExporting(true);
+    try {
+      var res = await api.get("/analytics/" + params.id + "/events");
+      var events = res.data.events;
+
+      if (events.length === 0) {
+        alert("No click events to export yet.");
+        return;
+      }
+
+      var csv = Papa.unparse(
+        events.map(function (e) {
+          return {
+            timestamp: new Date(e.timestamp).toISOString(),
+            referrer: e.referrer,
+            device: e.device,
+            browser: e.browser,
+            os: e.os,
+            country: e.country,
+            city: e.city,
+          };
+        }),
+      );
+
+      var blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+      var url = URL.createObjectURL(blob);
+      var link = document.createElement("a");
+      link.href = url;
+      link.download = res.data.shortCode + "-clicks.csv";
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error(err);
+      alert("Export failed");
+    } finally {
+      setExporting(false);
+    }
+  };
 
   if (loading) return <AnalyticsSkeleton />;
 
@@ -147,6 +189,14 @@ function AnalyticsContent() {
           Link analytics
         </h1>
       </div>
+
+      <button
+        onClick={handleExportCsv}
+        disabled={exporting}
+        className="text-sm border border-white/15 rounded-md px-3 py-1.5 text-text-muted hover:text-white hover:border-white/30 transition-colors disabled:opacity-50"
+      >
+        {exporting ? "Exporting..." : "Export CSV"}
+      </button>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <StatCard label="Total clicks" value={data.totalClicks} />
