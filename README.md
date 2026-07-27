@@ -2,7 +2,7 @@
 
 A production-grade URL shortener with session-based authentication, real-time click analytics, an admin control panel, and abuse-resistant infrastructure — built as a full-stack learning project and open-sourced for anyone who wants to study, fork, or contribute.
 
-Long URLs go in, short trackable ones come out — with password protection, expiration, custom aliases, tags, and a full analytics dashboard behind them. Anonymous visitors can shorten links too, with a lighter feature set that nudges toward creating an account.
+Long URLs go in, short trackable ones come out — with password protection, expiration, custom aliases, tags, downloadable QR codes, a standalone Quick QR generator, and a full analytics dashboard behind them. Anonymous visitors can shorten links too, with a lighter feature set that nudges toward creating an account.
 
 ---
 
@@ -36,6 +36,7 @@ Long URLs go in, short trackable ones come out — with password protection, exp
     - [Resolving Short Links](#resolving-short-links)
     - [Analytics](#analytics-1)
     - [QR Codes](#qr-codes)
+      - [Quick QR Generator](#quick-qr-generator)
     - [Reports](#reports)
     - [Admin](#admin)
     - [Health](#health)
@@ -67,7 +68,9 @@ Long URLs go in, short trackable ones come out — with password protection, exp
 - Soft deletes — deactivated links keep their analytics history intact
 - Bulk select + bulk deactivate from the dashboard, with a mobile-friendly sticky action bar
 - Search, status filter (active / expired / password-protected), tag filter, and sort (newest, oldest, most/least clicks)
-- Downloadable QR code per link
+- Downloadable QR code for every shortened link
+- Public QR generation for any URL without creating a shortened link
+- Dedicated `QuickQrForm` component for instant QR generation from the homepage and dashboard
 
 ### Redirect Engine
 - Redis-first lookup on the hot path, falling back to MongoDB on cache miss
@@ -95,7 +98,7 @@ Long URLs go in, short trackable ones come out — with password protection, exp
 - A minimal, dismissible cookie notice banner (session cookie is strictly essential — no tracking/advertising cookies are used)
 
 ### Reliability & Abuse Prevention
-- Redis-backed rate limiting (`rate-limiter-flexible`) — separate limits for anonymous link creation, authenticated link creation, redirects, login attempts, OTP resends, and abuse reports
+- Redis-backed rate limiting (`rate-limiter-flexible`) — separate limits for anonymous link creation, authenticated link creation, redirects, login attempts, OTP resends, QR generation, and abuse reports
 - Custom request-body sanitization middleware to strip NoSQL injection operators (`$`, dotted keys) from incoming requests
 - `/health` endpoint reporting server, MongoDB, and Redis status
 - A frontend latency indicator, present on every page, that polls `/health` every few seconds — shows live round-trip time and flags backend downtime (also doubles as a partial keep-alive signal for free-tier hosts while a tab is open)
@@ -298,9 +301,23 @@ All routes are prefixed with `/api/v1` unless noted otherwise.
 
 ### QR Codes
 
-| Method | Route | Description |
-|---|---|---|
-| GET | `/qr/:id` | Generate a QR code (as a data URL) for a link |
+| Method | Route          | Description                                                                                    |
+| ------ | -------------- | ---------------------------------------------------------------------------------------------- |
+| GET    | `/qr/:id`      | Generate a QR code (data URL) for one of the authenticated user's shortened links              |
+| POST   | `/qr/generate` | Generate a QR code for any valid URL without creating a database record (public, rate-limited) |
+
+#### Quick QR Generator
+
+The frontend includes a dedicated **QuickQrForm** component that allows visitors to generate a QR code for any valid URL instantly.
+
+Unlike shortened links, Quick QR generation:
+
+- does **not** create a database record
+- does **not** require authentication
+- returns the QR code immediately
+- is protected by Redis-backed rate limiting to prevent abuse
+
+Authenticated users can still generate QR codes for their own shortened links using the `/qr/:id` endpoint.
 
 ### Reports
 
