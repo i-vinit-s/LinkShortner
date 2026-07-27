@@ -2,6 +2,7 @@ const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
 const morgan = require("morgan");
+const compression = require("compression");
 const session = require("express-session");
 const { RedisStore } = require("connect-redis");
 const redisClient = require("./config/redis");
@@ -29,13 +30,14 @@ app.use(
 );
 app.use(morgan("dev"));
 app.use(mongoSanitize());
+app.use(compression());
 app.use(
   cors({
     origin: process.env.CLIENT_URL,
     credentials: true, // required for session cookies cross-origin
   }),
 );
-app.use(express.json());
+app.use(express.json({ limit: "10kb" }));
 
 app.use(
   session({
