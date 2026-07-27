@@ -25,6 +25,14 @@ export default function Navbar() {
         {user && (
           <span className="text-sm text-text-muted font-body">{user.name}</span>
         )}
+        {user && user.isAdmin ? (
+          <button
+            href="/admin"
+            className="text-sm border border-white/15 rounded-md px-3 py-1.5 text-text-muted hover:text-white hover:border-white/30 transition-colors"
+          >
+            <Link href={"/admin"}>Admin Panel</Link>
+          </button>
+        ) : null}
         {user && (
           <button
             onClick={handleLogout}
