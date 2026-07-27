@@ -158,18 +158,13 @@ exports.listReports = async function (req, res) {
 
 exports.actionReport = async function (req, res) {
   try {
-    var report = await Report.findById(req.params.id);
+    var report = await Report.findById(req.params.id).populate("linkId");
     if (!report) return res.status(404).json({ message: "Report not found" });
 
-    var candidate = report.shortCodeOrUrl;
-    var match = candidate.match(/\/([A-Za-z0-9_-]+)\/?$/);
-    var shortCode = match ? match[1] : candidate;
-
-    var link = await Link.findOne({ shortCode: shortCode });
-    if (link) {
-      link.isActive = false;
-      await link.save();
-      await redisClient.del("short:" + shortCode);
+    if (report.linkId) {
+      report.linkId.isActive = false;
+      await report.linkId.save();
+      await redisClient.del("short:" + report.linkId.shortCode);
     }
 
     report.status = "actioned";

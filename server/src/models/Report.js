@@ -3,6 +3,11 @@ const mongoose = require("mongoose");
 const reportSchema = new mongoose.Schema(
   {
     shortCodeOrUrl: { type: String, required: true, trim: true },
+    linkId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Link",
+      default: null,
+    },
     reason: { type: String, required: true, trim: true },
     reporterEmail: { type: String, default: null, trim: true },
     status: {

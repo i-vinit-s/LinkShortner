@@ -25,10 +25,24 @@ exports.submitReport = async (req, res) => {
         .json({ message: "Please enter a valid email or leave it blank" });
     }
 
+    // Try to extract a short code from whatever was submitted (a bare code, or a full short URL)
+    var match = shortCodeOrUrl.match(/\/([A-Za-z0-9_-]+)\/?$/);
+    var candidateCode = match ? match[1] : shortCodeOrUrl;
+
+    var link = await Link.findOne({ shortCode: candidateCode });
+
+    if (!link) {
+      return res.status(404).json({
+        message:
+          "We couldn't find a link matching that code or URL. Please double-check and try again.",
+      });
+    }
+
     await Report.create({
       shortCodeOrUrl: shortCodeOrUrl,
       reason: reason,
       reporterEmail: reporterEmail || null,
+      linkId: link._id, // now we can reference the real link directly
     });
 
     res
