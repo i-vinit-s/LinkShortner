@@ -3,6 +3,8 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
+import Link from "next/link";
+import QuickShortenForm from "@/components/QuickShortenForm";
 
 export default function HomePage() {
   const { user, loading } = useAuth();
@@ -23,12 +25,11 @@ export default function HomePage() {
   }
 
   if (user) {
-    // Redirect is in flight via the effect above — render nothing to avoid a flash of landing content
     return null;
   }
 
   return (
-    <div className="min-h-screen bg-ink flex flex-col items-center justify-center px-4 text-center gap-6">
+    <div className="min-h-screen bg-ink flex flex-col items-center justify-center px-4 text-center gap-8 py-16">
       <div>
         <p className="text-xs uppercase tracking-widest text-wire font-mono mb-2">
           URL Shortener
@@ -42,19 +43,21 @@ export default function HomePage() {
         </p>
       </div>
 
+      <QuickShortenForm />
+
       <div className="flex gap-3">
-        <a
+        <Link
           href="/signup"
           className="bg-signal text-ink font-display font-medium rounded-md px-5 py-2.5 hover:brightness-110 transition"
         >
           Get started
-        </a>
-        <a
+        </Link>
+        <Link
           href="/login"
           className="border border-white/15 text-white rounded-md px-5 py-2.5 hover:border-white/30 transition"
         >
           Log in
-        </a>
+        </Link>
       </div>
     </div>
   );

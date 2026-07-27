@@ -5,6 +5,7 @@ const redisClient = require("../config/redis");
 const { encode } = require("../utils/base62");
 const { getNextCounter } = require("../utils/counter");
 const { isUrlMalicious } = require("../utils/safeBrowsing");
+const { generateRandomCode } = require("../utils/randomCode");
 
 const RESERVED_ALIASES = [
   "api",
@@ -27,10 +28,7 @@ function isSafeUrl(url) {
 exports.createLink = async (req, res) => {
   try {
     var longUrl = req.body.longUrl;
-    var customAlias = req.body.customAlias;
-    var expiresAt = req.body.expiresAt;
-    var password = req.body.password;
-    var tags = req.body.tags;
+    var isAuthenticated = !!req.session.userId;
 
     if (!longUrl || !validUrl.isWebUri(longUrl)) {
       return res.status(400).json({ message: "A valid URL is required" });
@@ -42,82 +40,129 @@ exports.createLink = async (req, res) => {
         .json({ message: "Only http/https URLs are allowed" });
     }
 
-    // Normalize tags: trim, lowercase, dedupe, cap length and count
-    var cleanTags = [];
-    if (Array.isArray(tags)) {
-      var seen = {};
-      for (var i = 0; i < tags.length; i++) {
-        var t = String(tags[i]).trim().toLowerCase().slice(0, 20);
-        if (t !== "" && !seen[t]) {
-          seen[t] = true;
-          cleanTags.push(t);
-        }
-        if (cleanTags.length >= 5) break; // cap at 5 tags per link
-      }
-    }
-
-    const malicious = await isUrlMalicious(longUrl);
+    var malicious = await isUrlMalicious(longUrl);
     if (malicious) {
-      return res.status(400).json({
-        message: "This URL has been flagged as unsafe and cannot be shortened",
-      });
-    }
-
-    let shortCode;
-
-    if (customAlias) {
-      const alias = customAlias.trim();
-      if (!/^[a-zA-Z0-9_-]{3,20}$/.test(alias)) {
-        return res.status(400).json({
-          message: "Alias must be 3-20 chars, letters/numbers/-/_ only",
+      return res
+        .status(400)
+        .json({
+          message:
+            "This URL has been flagged as unsafe and cannot be shortened",
         });
-      }
-      if (RESERVED_ALIASES.includes(alias.toLowerCase())) {
-        return res.status(400).json({ message: "This alias is reserved" });
-      }
-      const exists = await Link.findOne({ shortCode: alias });
-      if (exists) {
-        return res.status(409).json({ message: "Alias already taken" });
-      }
-      shortCode = alias;
-    } else {
-      const counter = await getNextCounter();
-      shortCode = encode(counter);
     }
 
     var linkData = {
-      shortCode: shortCode,
       longUrl: longUrl,
-      customAlias: !!customAlias,
-      userId: req.session.userId || null,
-      expiresAt: expiresAt || null,
-      tags: cleanTags,
+      userId: isAuthenticated ? req.session.userId : null,
     };
 
-    if (password) {
-      linkData.passwordHash = await bcrypt.hash(password, 10);
+    if (isAuthenticated) {
+      // --- Full feature set for logged-in users ---
+      var customAlias = req.body.customAlias;
+      var expiresAt = req.body.expiresAt;
+      var password = req.body.password;
+      var tags = req.body.tags;
+
+      var cleanTags = [];
+      if (Array.isArray(tags)) {
+        var seen = {};
+        for (var i = 0; i < tags.length; i++) {
+          var t = String(tags[i]).trim().toLowerCase().slice(0, 20);
+          if (t !== "" && !seen[t]) {
+            seen[t] = true;
+            cleanTags.push(t);
+          }
+          if (cleanTags.length >= 5) break;
+        }
+      }
+      linkData.tags = cleanTags;
+      linkData.expiresAt = expiresAt || null;
+
+      if (customAlias) {
+        var alias = customAlias.trim();
+        if (!/^[a-zA-Z0-9_-]{3,20}$/.test(alias)) {
+          return res
+            .status(400)
+            .json({
+              message: "Alias must be 3-20 chars, letters/numbers/-/_ only",
+            });
+        }
+        if (RESERVED_ALIASES.includes(alias.toLowerCase())) {
+          return res.status(400).json({ message: "This alias is reserved" });
+        }
+        var existsAlias = await Link.findOne({ shortCode: alias });
+        if (existsAlias) {
+          return res.status(409).json({ message: "Alias already taken" });
+        }
+        linkData.shortCode = alias;
+        linkData.customAlias = true;
+      }
+
+      if (password) {
+        linkData.passwordHash = await bcrypt.hash(password, 10);
+      }
+    } else {
+      // --- Anonymous users: no alias, no password, no tags, no custom expiry ---
+      // Anonymous links also auto-expire after 14 days — a soft nudge toward creating an account for permanent links.
+      linkData.expiresAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
     }
 
-    const link = await Link.create(linkData);
+    var link;
 
-    // Warm the Redis cache immediately so the very first redirect is also fast
-    const cacheValue = JSON.stringify({
+    if (linkData.shortCode) {
+      // Custom alias path — already validated as unique above
+      link = await Link.create(linkData);
+    } else {
+      // Generate a short code — sequential for authenticated users (predictable, fine since it's their own),
+      // random-looking for anonymous users (harder to enumerate, and reads as more "temporary/throwaway")
+      var attempts = 0;
+      while (attempts < 5) {
+        var candidateCode = isAuthenticated
+          ? encode(await getNextCounter())
+          : generateRandomCode(7);
+
+        try {
+          linkData.shortCode = candidateCode;
+          link = await Link.create(linkData);
+          break;
+        } catch (err) {
+          if (err.code === 11000) {
+            attempts++;
+            continue; // collision — extremely rare, just retry with a new code
+          }
+          throw err;
+        }
+      }
+
+      if (!link) {
+        return res
+          .status(500)
+          .json({
+            message: "Could not generate a unique short code, please try again",
+          });
+      }
+    }
+
+    var cacheValue = JSON.stringify({
       longUrl: link.longUrl,
       hasPassword: !!link.passwordHash,
       isActive: link.isActive,
     });
 
     if (link.expiresAt) {
-      const ttlSeconds = Math.floor(
+      var ttlSeconds = Math.floor(
         (new Date(link.expiresAt) - Date.now()) / 1000,
       );
       if (ttlSeconds > 0)
-        await redisClient.setEx(`short:${shortCode}`, ttlSeconds, cacheValue);
+        await redisClient.setEx(
+          "short:" + link.shortCode,
+          ttlSeconds,
+          cacheValue,
+        );
     } else {
-      await redisClient.set(`short:${shortCode}`, cacheValue);
+      await redisClient.set("short:" + link.shortCode, cacheValue);
     }
 
-    res.status(201).json({ link });
+    res.status(201).json({ link: link });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Failed to create link" });
