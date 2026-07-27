@@ -12,6 +12,7 @@ const authRoutes = require("./routes/auth.routes");
 const linkRoutes = require("./routes/link.routes");
 const redirectRoutes = require("./routes/redirect.routes");
 const analyticsRoutes = require("./routes/analytics.routes");
+const reportRoutes = require("./routes/report.routes");
 const qrRoutes = require("./routes/qr.routes");
 
 const app = express();
@@ -77,5 +78,7 @@ app.use("/", redirectRoutes);
 app.use("/api/v1/analytics", analyticsRoutes);
 
 app.use('/api/v1/qr', qrRoutes);
+
+app.use("/api/v1/reports", reportRoutes);
 
 module.exports = app;

@@ -42,6 +42,14 @@ const otpLimiter = new RateLimiterRedis({
   duration: 600, // 3 resends per 10 minutes
 });
 
+const reportLimiter = new RateLimiterRedis({
+  storeClient: redisClient,
+  useRedisPackage: true,
+  keyPrefix: "rl:report",
+  points: 5,
+  duration: 3600, // 5 reports per hour per IP
+});
+
 function makeMiddleware(limiter, keyFn) {
   return async (req, res, next) => {
     try {
@@ -85,4 +93,5 @@ module.exports = {
     otpLimiter,
     (req) => req.body.email || getIp(req),
   ),
+  limitReport: makeMiddleware(reportLimiter, getIp),
 };
