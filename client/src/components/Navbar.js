@@ -80,7 +80,7 @@ export default function Navbar() {
           {user && (
             <button
               onClick={handleLogout}
-              className="text-sm border border-white/15 rounded-md px-3 py-1.5 text-text-muted hover:text-white hover:border-white/30 transition-colors"
+              className="text-sm border border-red-500/20 rounded-md px-3 py-1.5 text-red-400 hover:text-red-300 hover:border-red-500/40 hover:bg-red-500/5 transition-colors"
             >
               Log out
             </button>
