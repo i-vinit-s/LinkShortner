@@ -8,21 +8,42 @@ Long URLs go in, short trackable ones come out — with password protection, exp
 
 ## Table of Contents
 
-- [Features](#features)
-- [Tech Stack](#tech-stack)
-- [Architecture](#architecture)
-- [Project Structure](#project-structure)
-- [Getting Started](#getting-started)
-  - [Prerequisites](#prerequisites)
-  - [Backend Setup](#backend-setup)
-  - [Frontend Setup](#frontend-setup)
-- [Environment Variables](#environment-variables)
-- [API Reference](#api-reference)
-- [Security Notes](#security-notes)
-- [Legal & Trust](#legal--trust)
-- [Roadmap](#roadmap)
-- [Contributing](#contributing)
-- [License](#license)
+- [ShortLink](#shortlink)
+  - [Table of Contents](#table-of-contents)
+  - [Features](#features)
+    - [Authentication](#authentication)
+    - [Link Management](#link-management)
+    - [Redirect Engine](#redirect-engine)
+    - [Analytics](#analytics)
+    - [Admin Dashboard](#admin-dashboard)
+    - [Trust \& Safety](#trust--safety)
+    - [Reliability \& Abuse Prevention](#reliability--abuse-prevention)
+    - [UI/UX](#uiux)
+  - [Tech Stack](#tech-stack)
+  - [Architecture](#architecture)
+  - [Project Structure](#project-structure)
+  - [Getting Started](#getting-started)
+    - [Prerequisites](#prerequisites)
+    - [Backend Setup](#backend-setup)
+    - [Frontend Setup](#frontend-setup)
+    - [Creating your first admin account](#creating-your-first-admin-account)
+  - [Environment Variables](#environment-variables)
+    - [`server/.env`](#serverenv)
+    - [`client/.env.local`](#clientenvlocal)
+  - [API Reference](#api-reference)
+    - [Auth](#auth)
+    - [Links](#links)
+    - [Resolving Short Links](#resolving-short-links)
+    - [Analytics](#analytics-1)
+    - [QR Codes](#qr-codes)
+    - [Reports](#reports)
+    - [Admin](#admin)
+    - [Health](#health)
+  - [Security Notes](#security-notes)
+  - [Legal \& Trust](#legal--trust)
+  - [Roadmap](#roadmap)
+  - [Contributing](#contributing)
+  - [License](#license)
 
 ---
 
@@ -222,8 +243,7 @@ Log out and back in afterward so your session picks up the updated flag, then vi
 | `MONGO_URI` | MongoDB connection string |
 | `REDIS_URL` | Redis connection string |
 | `SESSION_SECRET` | Long random string used to sign session cookies |
-| `CLIENT_URL` | Your frontend's origin (for CORS) |
-| `APP_URL` | The domain your short links resolve through (usually the frontend) |
+| `CLIENT_URL` | Your frontend's origin (for CORS) / The domain your short links resolve through (usually the frontend) |
 | `NODE_ENV` | `development` or `production` |
 | `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` / `SMTP_FROM` | Outbound email config for OTP delivery |
 | `SAFE_BROWSING_API_KEY` | (Optional) Google Safe Browsing key to flag malicious destination URLs |

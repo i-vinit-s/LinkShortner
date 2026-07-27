@@ -8,7 +8,8 @@ exports.getQrCode = async (req, res) => {
 
     if (!link) return res.status(404).json({ message: "Link not found" });
 
-    const shortUrl = process.env.APP_URL + "/" + link.shortCode;
+    // CLIENT_URL must be your frontend's domain, not the API's — this is what was wrong
+    const shortUrl = process.env.CLIENT_URL + "/" + link.shortCode;
 
     const qrDataUrl = await QRCode.toDataURL(shortUrl, {
       width: 300,
@@ -19,7 +20,7 @@ exports.getQrCode = async (req, res) => {
       },
     });
 
-    res.json({ qrDataUrl, shortUrl });
+    res.json({ qrDataUrl, shortUrl, shortCode: link.shortCode });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Failed to generate QR code" });
