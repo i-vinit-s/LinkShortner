@@ -5,6 +5,7 @@ const morgan = require("morgan");
 const session = require("express-session");
 const { RedisStore } = require("connect-redis");
 const redisClient = require("./config/redis");
+const mongoSanitize = require("express-mongo-sanitize");
 
 const authRoutes = require("./routes/auth.routes");
 const linkRoutes = require("./routes/link.routes");
@@ -14,8 +15,20 @@ const qrRoutes = require("./routes/qr.routes");
 
 const app = express();
 
-app.use(helmet());
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", "data:"],
+      },
+    },
+  }),
+);
 app.use(morgan("dev"));
+app.use(mongoSanitize());
 app.use(
   cors({
     origin: process.env.CLIENT_URL,

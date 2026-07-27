@@ -15,6 +15,15 @@ const RESERVED_ALIASES = [
   "health",
 ];
 
+function isSafeUrl(url) {
+  try {
+    var parsed = new URL(url);
+    return parsed.protocol === "http:" || parsed.protocol === "https:";
+  } catch (err) {
+    return false;
+  }
+}
+
 exports.createLink = async (req, res) => {
   try {
     var longUrl = req.body.longUrl;
@@ -25,6 +34,12 @@ exports.createLink = async (req, res) => {
 
     if (!longUrl || !validUrl.isWebUri(longUrl)) {
       return res.status(400).json({ message: "A valid URL is required" });
+    }
+
+    if (!isSafeUrl(longUrl)) {
+      return res
+        .status(400)
+        .json({ message: "Only http/https URLs are allowed" });
     }
 
     // Normalize tags: trim, lowercase, dedupe, cap length and count
