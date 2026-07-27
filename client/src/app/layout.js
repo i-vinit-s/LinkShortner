@@ -2,6 +2,7 @@ import { Space_Grotesk, IBM_Plex_Sans, JetBrains_Mono } from "next/font/google";
 import { AuthProvider } from "@/context/AuthContext";
 import LatencyIndicator from "@/components/LatencyIndicator";
 import CookieBanner from "@/components/CookieBanner";
+import Footer from "@/components/Footer";
 import "./globals.css";
 
 const display = Space_Grotesk({
@@ -32,7 +33,7 @@ export default function RootLayout({ children }) {
       className={display.variable + " " + body.variable + " " + mono.variable}
     >
       <body>
-        <AuthProvider>{children}</AuthProvider>
+        <AuthProvider>{children}<Footer/></AuthProvider>
         <LatencyIndicator />
         <CookieBanner />
       </body>
