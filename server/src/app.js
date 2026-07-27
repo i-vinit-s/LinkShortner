@@ -6,7 +6,7 @@ const compression = require("compression");
 const session = require("express-session");
 const { RedisStore } = require("connect-redis");
 const redisClient = require("./config/redis");
-const mongoSanitize = require("express-mongo-sanitize");
+const sanitizeRequest = require("./middleware/sanitize");
 
 const authRoutes = require("./routes/auth.routes");
 const linkRoutes = require("./routes/link.routes");
@@ -29,7 +29,7 @@ app.use(
   }),
 );
 app.use(morgan("dev"));
-app.use(mongoSanitize());
+app.use(sanitizeRequest);
 app.use(compression());
 app.use(
   cors({
