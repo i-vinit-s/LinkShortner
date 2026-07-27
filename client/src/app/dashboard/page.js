@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import Navbar from "@/components/Navbar";
 import CreateLinkForm from "@/components/CreateLinkForm";
+import QuickQrForm from "@/components/QuickQrForm";
 import LinkCard from "@/components/LinkCard";
 import LinkFilterBar from "@/components/LinkFilterBar";
 import api from "@/lib/api";
@@ -20,6 +21,8 @@ function DashboardContent() {
 
   var [availableTags, setAvailableTags] = useState([]);
   var [tagFilter, setTagFilter] = useState("all");
+
+  var [activeTab, setActiveTab] = useState("url"); // "url" | "qr"
 
   useEffect(function () {
     var loadData = async function () {
@@ -180,84 +183,123 @@ function DashboardContent() {
           </h1>
         </div>
 
-        <CreateLinkForm onCreated={handleCreated} />
+        <div className="space-y-4">
+          <div className="flex gap-2 border-b border-white/10">
+            <button
+              onClick={function () {
+                setActiveTab("url");
+              }}
+              className={
+                "text-sm px-3 py-2 border-b-2 transition-colors " +
+                (activeTab === "url"
+                  ? "border-signal text-white"
+                  : "border-transparent text-text-muted hover:text-white")
+              }
+            >
+              Shorten URL
+            </button>
 
-        {loading ? (
-          <div className="space-y-3 animate-pulse">
-            <div className="h-16 bg-surface rounded-lg" />
-            <div className="h-16 bg-surface rounded-lg" />
-            <div className="h-16 bg-surface rounded-lg" />
+            <button
+              onClick={function () {
+                setActiveTab("qr");
+              }}
+              className={
+                "text-sm px-3 py-2 border-b-2 transition-colors " +
+                (activeTab === "qr"
+                  ? "border-signal text-white"
+                  : "border-transparent text-text-muted hover:text-white")
+              }
+            >
+              Generate QR
+            </button>
           </div>
-        ) : links.length === 0 ? (
-          <div className="border border-dashed border-white/15 rounded-lg p-8 text-center">
-            <p className="text-text-muted text-sm">
-              No links yet. Paste a URL above to patch your first one in.
-            </p>
-          </div>
-        ) : (
-          <>
-            <LinkFilterBar
-              search={search}
-              setSearch={setSearch}
-              statusFilter={statusFilter}
-              setStatusFilter={setStatusFilter}
-              sortBy={sortBy}
-              setSortBy={setSortBy}
-              availableTags={availableTags}
-              tagFilter={tagFilter}
-              setTagFilter={setTagFilter}
-            />
 
-            <div className="flex items-center justify-between gap-3">
-              <label className="flex items-center gap-2 text-sm text-text-muted cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={allSelected}
-                  onChange={toggleSelectAllFiltered}
-                  className="accent-signal w-4 h-4 shrink-0"
-                />
-                <span>
-                  {selectedIds.length > 0
-                    ? selectedIds.length + " selected"
-                    : "Select all (" + filteredLinks.length + ")"}
-                </span>
-              </label>
+          {activeTab === "url" ? (
+            <>
+              <CreateLinkForm onCreated={handleCreated} />
 
-              {/* Desktop bulk-delete button — hidden on mobile, replaced by the sticky bar below */}
-              {selectedIds.length > 0 ? (
-                <button
-                  onClick={handleBulkDelete}
-                  disabled={bulkLoading}
-                  className="hidden sm:inline-flex text-sm border border-danger/30 text-danger rounded-md px-3 py-1.5 hover:bg-danger/10 transition-colors disabled:opacity-50 shrink-0"
-                >
-                  {bulkLoading ? "Deactivating..." : "Deactivate selected"}
-                </button>
-              ) : null}
-            </div>
-
-            <div className="space-y-3">
-              {filteredLinks.length === 0 ? (
+              {loading ? (
+                <div className="space-y-3 animate-pulse">
+                  <div className="h-16 bg-surface rounded-lg" />
+                  <div className="h-16 bg-surface rounded-lg" />
+                  <div className="h-16 bg-surface rounded-lg" />
+                </div>
+              ) : links.length === 0 ? (
                 <div className="border border-dashed border-white/15 rounded-lg p-8 text-center">
                   <p className="text-text-muted text-sm">
-                    No links match your search or filters.
+                    No links yet. Paste a URL above to patch your first one in.
                   </p>
                 </div>
               ) : (
-                filteredLinks.map(function (link) {
-                  return (
-                    <LinkCard
-                      key={link._id}
-                      link={link}
-                      onDelete={handleDelete}
-                      selected={selectedIds.indexOf(link._id) !== -1}
-                      onToggleSelect={toggleSelect}
-                    />
-                  );
-                })
+                <>
+                  <LinkFilterBar
+                    search={search}
+                    setSearch={setSearch}
+                    statusFilter={statusFilter}
+                    setStatusFilter={setStatusFilter}
+                    sortBy={sortBy}
+                    setSortBy={setSortBy}
+                    availableTags={availableTags}
+                    tagFilter={tagFilter}
+                    setTagFilter={setTagFilter}
+                  />
+
+                  <div className="flex items-center justify-between gap-3">
+                    <label className="flex items-center gap-2 text-sm text-text-muted cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={allSelected}
+                        onChange={toggleSelectAllFiltered}
+                        className="accent-signal w-4 h-4 shrink-0"
+                      />
+                      <span>
+                        {selectedIds.length > 0
+                          ? selectedIds.length + " selected"
+                          : "Select all (" + filteredLinks.length + ")"}
+                      </span>
+                    </label>
+
+                    {selectedIds.length > 0 ? (
+                      <button
+                        onClick={handleBulkDelete}
+                        disabled={bulkLoading}
+                        className="hidden sm:inline-flex text-sm border border-danger/30 text-danger rounded-md px-3 py-1.5 hover:bg-danger/10 transition-colors disabled:opacity-50 shrink-0"
+                      >
+                        {bulkLoading
+                          ? "Deactivating..."
+                          : "Deactivate selected"}
+                      </button>
+                    ) : null}
+                  </div>
+
+                  <div className="space-y-3">
+                    {filteredLinks.length === 0 ? (
+                      <div className="border border-dashed border-white/15 rounded-lg p-8 text-center">
+                        <p className="text-text-muted text-sm">
+                          No links match your search or filters.
+                        </p>
+                      </div>
+                    ) : (
+                      filteredLinks.map(function (link) {
+                        return (
+                          <LinkCard
+                            key={link._id}
+                            link={link}
+                            onDelete={handleDelete}
+                            selected={selectedIds.indexOf(link._id) !== -1}
+                            onToggleSelect={toggleSelect}
+                          />
+                        );
+                      })
+                    )}
+                  </div>
+                </>
               )}
-            </div>
-          </>
-        )}
+            </>
+          ) : (
+            <QuickQrForm />
+          )}
+        </div>
       </div>
 
       {/* Mobile-only sticky bulk-action bar — appears at the thumb-reachable bottom of the screen */}

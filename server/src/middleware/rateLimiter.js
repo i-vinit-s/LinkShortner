@@ -50,6 +50,14 @@ const reportLimiter = new RateLimiterRedis({
   duration: 3600, // 5 reports per hour per IP
 });
 
+const qrGenLimiter = new RateLimiterRedis({
+  storeClient: redisClient,
+  useRedisPackage: true,
+  keyPrefix: "rl:qr-generate",
+  points: 15,
+  duration: 60, // 15 QR generations per minute per IP
+});
+
 function makeMiddleware(limiter, keyFn) {
   return async (req, res, next) => {
     try {
@@ -94,4 +102,5 @@ module.exports = {
     (req) => req.body.email || getIp(req),
   ),
   limitReport: makeMiddleware(reportLimiter, getIp),
+  limitQrGenerate: makeMiddleware(qrGenLimiter, getIp),
 };
