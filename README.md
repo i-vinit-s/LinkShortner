@@ -2,7 +2,7 @@
 
 A production-grade URL shortener with session-based authentication, real-time click analytics, an admin control panel, and abuse-resistant infrastructure — built as a full-stack learning project and open-sourced for anyone who wants to study, fork, or contribute.
 
-Long URLs go in, short trackable ones come out — with password protection, expiration, custom aliases, tags, downloadable QR codes, a standalone Quick QR generator, and a full analytics dashboard behind them. Anonymous visitors can shorten links too, with a lighter feature set that nudges toward creating an account.
+Long URLs go in, short trackable ones come out — with password protection, expiration, custom aliases, tags, downloadable QR codes, QR analytics, a standalone Quick QR generator, customizable bio pages, and a full analytics dashboard behind them. Anonymous visitors can shorten links too, with a lighter feature set that nudges toward creating an account.
 
 ---
 
@@ -13,6 +13,7 @@ Long URLs go in, short trackable ones come out — with password protection, exp
   - [Features](#features)
     - [Authentication](#authentication)
     - [Link Management](#link-management)
+    - [Bio Pages](#bio-pages)
     - [Redirect Engine](#redirect-engine)
     - [Analytics](#analytics)
     - [Admin Dashboard](#admin-dashboard)
@@ -37,6 +38,7 @@ Long URLs go in, short trackable ones come out — with password protection, exp
     - [Analytics](#analytics-1)
     - [QR Codes](#qr-codes)
       - [Quick QR Generator](#quick-qr-generator)
+    - [Bio Pages](#bio-pages-1)
     - [Reports](#reports)
     - [Admin](#admin)
     - [Health](#health)
@@ -71,6 +73,21 @@ Long URLs go in, short trackable ones come out — with password protection, exp
 - Downloadable QR code for every shortened link
 - Public QR generation for any URL without creating a shortened link
 - Dedicated `QuickQrForm` component for instant QR generation from the homepage and dashboard
+- QR codes generated for shortened links include analytics tracking, allowing QR scans to be measured alongside normal link visits
+- Link model tracks the visitor source (direct, QR, etc.) for improved analytics
+
+### Bio Pages
+
+- Create fully customizable public bio / link-in-bio pages
+- Multiple bio pages per account
+- Unique slug for every public bio page
+- Live slug availability validation
+- Theme picker with built-in presets
+- Custom colors and appearance configuration
+- Social media icon library via `BioIcons`
+- Drag-and-edit style bio builder (`BioBuilder`)
+- Public profile pages available without authentication
+- Publish / unpublish support
 
 ### Redirect Engine
 - Redis-first lookup on the hot path, falling back to MongoDB on cache miss
@@ -79,7 +96,7 @@ Long URLs go in, short trackable ones come out — with password protection, exp
 - Open-redirect protection — only `http`/`https` destination URLs are accepted
 
 ### Analytics
-- Per-link dashboard: clicks over time, top referrers, device breakdown, top countries
+- Per-link dashboard: clicks over time, top referrers, device breakdown, top countries, and traffic source (including QR scans)
 - Device/browser/OS parsing via `ua-parser-js`, approximate geolocation via `geoip-lite`
 - Click events are queued in Redis and drained in batches by a background worker (not written to MongoDB one-by-one) to keep the hot path fast
 - Raw click-event CSV export per link
@@ -90,6 +107,7 @@ Long URLs go in, short trackable ones come out — with password protection, exp
 - **Users** — searchable, paginated list; ban/reinstate any non-admin account (admins cannot be banned or ban other admins)
 - **Links** — searchable, paginated list across all users; deactivate/reactivate any link
 - **Reports** — review, action (deactivate the reported link), or dismiss abuse reports
+- **Bio Pages** — browse every user's bio page, publish/unpublish pages, or remove inappropriate content
 
 ### Trust & Safety
 - Public abuse-report form, rate-limited to prevent spam reports
@@ -102,11 +120,15 @@ Long URLs go in, short trackable ones come out — with password protection, exp
 - Custom request-body sanitization middleware to strip NoSQL injection operators (`$`, dotted keys) from incoming requests
 - `/health` endpoint reporting server, MongoDB, and Redis status
 - A frontend latency indicator, present on every page, that polls `/health` every few seconds — shows live round-trip time and flags backend downtime (also doubles as a partial keep-alive signal for free-tier hosts while a tab is open)
+- Rate limiting for public bio page views
 
 ### UI/UX
 - Dark, custom-themed interface (no default component-library look) with a consistent color and typography system across every page
 - Fully responsive — dashboard, filters, bulk actions, and navbar all adapt to mobile with dedicated mobile patterns (sticky action bars, hamburger menu, stacked cards)
 - Skeleton loading states instead of bare "Loading..." text
+- Visual Bio Builder with theme customization
+- Built-in theme presets for bio pages
+- Public responsive bio profile pages
 
 ---
 
@@ -303,7 +325,7 @@ All routes are prefixed with `/api/v1` unless noted otherwise.
 
 | Method | Route          | Description                                                                                    |
 | ------ | -------------- | ---------------------------------------------------------------------------------------------- |
-| GET    | `/qr/:id`      | Generate a QR code (data URL) for one of the authenticated user's shortened links              |
+| GET    | `/qr/:id`      | Generate a QR code (data URL) for one of the authenticated user's shortened links. QR scans are tracked in link analytics              |
 | POST   | `/qr/generate` | Generate a QR code for any valid URL without creating a database record (public, rate-limited) |
 
 #### Quick QR Generator
@@ -318,6 +340,17 @@ Unlike shortened links, Quick QR generation:
 - is protected by Redis-backed rate limiting to prevent abuse
 
 Authenticated users can still generate QR codes for their own shortened links using the `/qr/:id` endpoint.
+
+### Bio Pages
+
+| Method | Route               | Description                                         |
+| ------ | ------------------- | --------------------------------------------------- |
+| GET    | `/bio/mine`         | List the authenticated user's bio pages             |
+| GET    | `/bio/mine/:id`     | Retrieve one bio page                               |
+| GET    | `/bio/check-slug`   | Check whether a slug is available                   |
+| POST   | `/bio`              | Create or update a bio page                         |
+| DELETE | `/bio/:id`          | Delete a bio page                                   |
+| GET    | `/bio/public/:slug` | Retrieve a published public bio page (rate-limited) |
 
 ### Reports
 
@@ -359,6 +392,9 @@ All routes below require an authenticated session **and** `isAdmin: true`.
 - Only `http`/`https` destination URLs are accepted, closing off `javascript:`/`data:` URI open-redirect vectors.
 - Admin routes require both a valid session **and** an `isAdmin` flag, checked via two independently composable middleware functions rather than one combined check.
 - Admin accounts cannot be banned, including by other admins, to prevent accidental or malicious lockouts.
+- Public bio pages are only accessible when published.
+- Bio page slugs are validated for uniqueness before creation.
+- Public bio page endpoints are protected with dedicated rate limiting.
 
 **Known limitation:** banning a user blocks future logins but does not invalidate an already-active session for that user. Immediate mid-session revocation would require indexing sessions by user ID in Redis — noted here for anyone extending this project.
 
@@ -372,6 +408,7 @@ Since this is a public-facing tool that collects account information and click/g
 - `/terms` — acceptable use and service terms
 - `/cookies` — plain-language cookie disclosure (one essential session cookie only, no tracking/ads)
 - `/report` — public abuse-reporting form, feeding directly into the admin Reports queue
+- Public bio pages respect the same abuse-reporting and moderation workflow as shortened links.
 
 These are intentionally simple markdown-style pages, appropriate for a portfolio-scale public launch rather than a fully lawyered compliance program.
 
