@@ -16,6 +16,15 @@ const userSchema = new mongoose.Schema(
     isAdmin: { type: Boolean, default: false },
     otpHash: { type: String, default: null },
     otpExpiresAt: { type: Date, default: null },
+    plan: { type: String, enum: ["free", "pro"], default: "free" },
+    razorpaySubscriptionId: { type: String, default: null },
+    razorpayCustomerId: { type: String, default: null },
+    subscriptionStatus: {
+      type: String,
+      enum: ["none", "created", "active", "cancelled", "past_due"],
+      default: "none",
+    },
+    currentPeriodEnd: { type: Date, default: null },
   },
   { timestamps: true },
 );

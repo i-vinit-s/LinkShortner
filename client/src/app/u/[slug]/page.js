@@ -138,9 +138,11 @@ export default async function PublicBioPage(props) {
 
         <div className="space-y-3 pt-2">{linkItems}</div>
 
-        <p className="text-xs pt-4" style={footerStyle}>
-          <Link href="/">Made with ShortLink</Link>
-        </p>
+        {page.showBranding ? (
+          <p className="text-xs pt-4" style={footerStyle}>
+            <a href="/">Made with ShortLink</a>
+          </p>
+        ) : null}
       </div>
     </div>
   );

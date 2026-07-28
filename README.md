@@ -2,7 +2,7 @@
 
 A production-grade URL shortener with session-based authentication, real-time click analytics, an admin control panel, and abuse-resistant infrastructure — built as a full-stack learning project and open-sourced for anyone who wants to study, fork, or contribute.
 
-Long URLs go in, short trackable ones come out — with password protection, expiration, custom aliases, tags, downloadable QR codes, QR analytics, a standalone Quick QR generator, customizable bio pages, and a full analytics dashboard behind them. Anonymous visitors can shorten links too, with a lighter feature set that nudges toward creating an account.
+Long URLs go in, short trackable ones come out — with password protection, expiration, custom aliases, tags, downloadable QR codes, QR analytics, customizable bio pages, subscription-powered Pro features, and a full analytics dashboard behind them. Anonymous visitors can shorten links too, with a lighter feature set that nudges toward creating an account.
 
 ---
 
@@ -14,6 +14,7 @@ Long URLs go in, short trackable ones come out — with password protection, exp
     - [Authentication](#authentication)
     - [Link Management](#link-management)
     - [Bio Pages](#bio-pages)
+    - [Billing \& Subscriptions](#billing--subscriptions)
     - [Redirect Engine](#redirect-engine)
     - [Analytics](#analytics)
     - [Admin Dashboard](#admin-dashboard)
@@ -39,6 +40,7 @@ Long URLs go in, short trackable ones come out — with password protection, exp
     - [QR Codes](#qr-codes)
       - [Quick QR Generator](#quick-qr-generator)
     - [Bio Pages](#bio-pages-1)
+    - [Billing \& Subscriptions](#billing--subscriptions-1)
     - [Reports](#reports)
     - [Admin](#admin)
     - [Health](#health)
@@ -59,6 +61,14 @@ Long URLs go in, short trackable ones come out — with password protection, exp
 - Rate-limited login and OTP resend to prevent brute-force / email-bombing abuse
 - Generic (non-enumerable) responses on sensitive endpoints to avoid leaking account existence
 - Role-based access via an `isAdmin` flag on the user model
+- Free and Pro account plans
+- Subscription status synchronized automatically through Razorpay webhooks
+- Each user account stores:
+  - Plan (`free` or `pro`)
+  - Razorpay Customer ID
+  - Razorpay Subscription ID
+  - Subscription status
+  - Current subscription billing period end date
 
 ### Link Management
 - **Anonymous shortening** from the homepage — no account required. Anonymous links get random, non-sequential short codes and auto-expire after 14 days, encouraging sign-up for permanent links
@@ -79,7 +89,8 @@ Long URLs go in, short trackable ones come out — with password protection, exp
 ### Bio Pages
 
 - Create fully customizable public bio / link-in-bio pages
-- Multiple bio pages per account
+- Free plan: 1 published bio page
+- Pro plan: unlimited bio pages
 - Unique slug for every public bio page
 - Live slug availability validation
 - Theme picker with built-in presets
@@ -88,6 +99,17 @@ Long URLs go in, short trackable ones come out — with password protection, exp
 - Drag-and-edit style bio builder (`BioBuilder`)
 - Public profile pages available without authentication
 - Publish / unpublish support
+- Watermark footer is automatically removed on Pro bio pages
+- Subscription-aware feature limits
+
+### Billing & Subscriptions
+
+- Razorpay-powered recurring subscriptions
+- Free and Pro plans
+- Secure webhook verification for subscription lifecycle events
+- Upgrade and cancel subscriptions directly from the dashboard
+- Automatic subscription status synchronization
+- Feature gating based on active subscription
 
 ### Redirect Engine
 - Redis-first lookup on the hot path, falling back to MongoDB on cache miss
@@ -146,6 +168,7 @@ Long URLs go in, short trackable ones come out — with password protection, exp
 | Rate Limiting | `rate-limiter-flexible` |
 | CSV Export | PapaParse |
 | QR Codes | `qrcode` |
+| Payments | Razorpay Subscriptions |
 
 ---
 
@@ -272,6 +295,10 @@ Log out and back in afterward so your session picks up the updated flag, then vi
 | `NODE_ENV` | `development` or `production` |
 | `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` / `SMTP_FROM` | Outbound email config for OTP delivery |
 | `SAFE_BROWSING_API_KEY` | (Optional) Google Safe Browsing key to flag malicious destination URLs |
+| `RAZORPAY_KEY_ID` | Razorpay API Key ID |
+| `RAZORPAY_KEY_SECRET` | Razorpay API Secret |
+| `RAZORPAY_PLAN_ID` | Razorpay Subscription Plan ID |
+| `RAZORPAY_WEBHOOK_SECRET` | Secret used to verify Razorpay webhooks |
 
 ### `client/.env.local`
 
@@ -352,6 +379,15 @@ Authenticated users can still generate QR codes for their own shortened links us
 | DELETE | `/bio/:id`          | Delete a bio page                                   |
 | GET    | `/bio/public/:slug` | Retrieve a published public bio page (rate-limited) |
 
+### Billing & Subscriptions
+
+| Method | Route                          | Description                                                 |
+| ------ | ------------------------------ | ----------------------------------------------------------- |
+| POST   | `/billing/create-subscription` | Create a Razorpay subscription for the authenticated user   |
+| GET    | `/billing/status`              | Retrieve the current subscription and billing status        |
+| POST   | `/billing/cancel`              | Cancel the current subscription                             |
+| POST   | `/billing/webhook`             | Razorpay webhook endpoint for subscription lifecycle events |
+
 ### Reports
 
 | Method | Route | Description |
@@ -395,6 +431,8 @@ All routes below require an authenticated session **and** `isAdmin: true`.
 - Public bio pages are only accessible when published.
 - Bio page slugs are validated for uniqueness before creation.
 - Public bio page endpoints are protected with dedicated rate limiting.
+- Razorpay webhook requests are verified using the configured webhook secret before processing subscription events.
+- Billing operations require an authenticated session except for the webhook endpoint, which is authenticated using Razorpay signature verification.
 
 **Known limitation:** banning a user blocks future logins but does not invalidate an already-active session for that user. Immediate mid-session revocation would require indexing sessions by user ID in Redis — noted here for anyone extending this project.
 
@@ -409,6 +447,7 @@ Since this is a public-facing tool that collects account information and click/g
 - `/cookies` — plain-language cookie disclosure (one essential session cookie only, no tracking/ads)
 - `/report` — public abuse-reporting form, feeding directly into the admin Reports queue
 - Public bio pages respect the same abuse-reporting and moderation workflow as shortened links.
+- Subscription payments are processed securely through Razorpay. Payment information is never stored directly by the application.
 
 These are intentionally simple markdown-style pages, appropriate for a portfolio-scale public launch rather than a fully lawyered compliance program.
 

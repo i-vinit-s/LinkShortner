@@ -1,4 +1,5 @@
 const BioPage = require("../models/BioPage");
+const User = require("../models/User");
 const { isValidTheme } = require("../utils/bioPresets");
 
 var RESERVED_SLUGS = [
@@ -81,12 +82,26 @@ exports.saveBioPage = async function (req, res) {
     var rawLinks = Array.isArray(req.body.links) ? req.body.links : [];
     var theme = req.body.theme || {};
 
-    if (!slug || !isValidSlug(slug)) {
-      return res
-        .status(400)
-        .json({
-          message: "Slug must be 3-30 characters: letters, numbers, - or _",
+    // Enforce the free-tier page limit only when creating a brand new page
+    if (!pageId) {
+      var user = await User.findById(req.session.userId);
+      var existingCount = await BioPage.countDocuments({
+        userId: req.session.userId,
+      });
+
+      if (user.plan === "free" && existingCount >= 1) {
+        return res.status(403).json({
+          message:
+            "Free accounts can create 1 bio page. Upgrade to Pro for unlimited pages.",
+          upgradeRequired: true,
         });
+      }
+    }
+
+    if (!slug || !isValidSlug(slug)) {
+      return res.status(400).json({
+        message: "Slug must be 3-30 characters: letters, numbers, - or _",
+      });
     }
     if (RESERVED_SLUGS.indexOf(slug) !== -1) {
       return res.status(400).json({ message: "This slug is reserved" });
@@ -173,7 +188,10 @@ exports.deleteBioPage = async function (req, res) {
 exports.getPublicBioPage = async function (req, res) {
   try {
     var slug = (req.params.slug || "").trim().toLowerCase();
-    var page = await BioPage.findOne({ slug: slug, isPublished: true });
+    var page = await BioPage.findOne({
+      slug: slug,
+      isPublished: true,
+    }).populate("userId", "plan");
 
     if (!page) return res.status(404).json({ message: "Page not found" });
 
@@ -189,6 +207,7 @@ exports.getPublicBioPage = async function (req, res) {
       avatarUrl: page.avatarUrl,
       links: page.links,
       theme: page.theme,
+      showBranding: !page.userId || page.userId.plan !== "pro",
     });
   } catch (err) {
     console.error(err);

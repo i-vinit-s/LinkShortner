@@ -8,6 +8,7 @@ import QuickQrForm from "@/components/QuickQrForm";
 import LinkCard from "@/components/LinkCard";
 import LinkFilterBar from "@/components/LinkFilterBar";
 import api from "@/lib/api";
+import BillingStatus from "@/components/BillingStatus";
 
 function DashboardContent() {
   var [links, setLinks] = useState([]);
@@ -184,6 +185,7 @@ function DashboardContent() {
         </div>
 
         <div className="space-y-4">
+          <BillingStatus />
           <div className="flex gap-2 border-b border-white/10">
             <button
               onClick={function () {

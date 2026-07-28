@@ -16,6 +16,7 @@ const reportRoutes = require("./routes/report.routes");
 const qrRoutes = require("./routes/qr.routes");
 const adminRoutes = require("./routes/admin.routes");
 const bioRoutes = require("./routes/bio.routes");
+const billingRoutes = require("./routes/billing.routes");
 
 const app = express();
 
@@ -40,7 +41,14 @@ app.use(
     credentials: true, // required for session cookies cross-origin
   }),
 );
-app.use(express.json({ limit: "10kb" }));
+app.use(
+  express.json({
+    limit: "10kb",
+    verify: function (req, res, buf) {
+      req.rawBody = buf; // preserved for webhook signature verification
+    },
+  }),
+);
 
 app.use(
   session({
@@ -86,5 +94,7 @@ app.use("/api/v1/reports", reportRoutes);
 app.use("/api/v1/admin", adminRoutes);
 
 app.use("/api/v1/bio", bioRoutes);
+
+app.use("/api/v1/billing", billingRoutes);
 
 module.exports = app;
