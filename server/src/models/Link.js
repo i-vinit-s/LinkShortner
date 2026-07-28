@@ -16,6 +16,7 @@ const linkSchema = new mongoose.Schema(
     clickCount: { type: Number, default: 0 },
     isActive: { type: Boolean, default: true },
     tags: { type: [String], default: [] },
+    source: { type: String, enum: ["dashboard", "qr"], default: "dashboard" },
   },
   { timestamps: true },
 );

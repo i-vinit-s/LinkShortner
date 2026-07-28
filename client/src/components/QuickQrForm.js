@@ -1,11 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import api from "@/lib/api";
 
-export default function QuickQrForm() {
+export default function QuickQrForm(props) {
+  var onSaved = props.onSaved;
   var [url, setUrl] = useState("");
-  var [qrDataUrl, setQrDataUrl] = useState(null);
+  var [result, setResult] = useState(null);
   var [loading, setLoading] = useState(false);
   var [error, setError] = useState("");
 
@@ -13,10 +15,14 @@ export default function QuickQrForm() {
     e.preventDefault();
     setError("");
     setLoading(true);
-    setQrDataUrl(null);
+    setResult(null);
     try {
       var res = await api.post("/qr/generate", { url: url });
-      setQrDataUrl(res.data.qrDataUrl);
+      setResult(res.data);
+      if (res.data.persisted && onSaved) {
+        onSaved();
+      }
+      setUrl("");
     } catch (err) {
       if (err.response && err.response.status === 429) {
         setError(
@@ -38,8 +44,8 @@ export default function QuickQrForm() {
 
   var handleDownload = function () {
     var a = document.createElement("a");
-    a.href = qrDataUrl;
-    a.download = "qr-code.png";
+    a.href = result.qrDataUrl;
+    a.download = (result.shortCode || "qr-code") + ".png";
     a.click();
   };
 
@@ -66,21 +72,42 @@ export default function QuickQrForm() {
 
       {error ? <p className="text-sm text-danger">{error}</p> : null}
 
-      {qrDataUrl ? (
+      {result ? (
         <div className="flex flex-col items-center gap-3 pt-2">
           <div className="bg-white rounded-lg p-4">
             <img
-              src={qrDataUrl}
+              src={result.qrDataUrl}
               alt="QR code"
               className="w-full max-w-50"
             />
           </div>
-          <button
-            onClick={handleDownload}
-            className="text-sm border border-white/15 rounded-md px-4 py-2 text-text-muted hover:text-white hover:border-white/30 transition-colors"
-          >
-            Download PNG
-          </button>
+
+          {result.persisted ? (
+            <p className="text-xs font-mono text-wire">{result.shortUrl}</p>
+          ) : null}
+
+          <div className="flex gap-2">
+            <button
+              onClick={handleDownload}
+              className="text-sm border border-white/15 rounded-md px-4 py-2 text-text-muted hover:text-white hover:border-white/30 transition-colors"
+            >
+              Download PNG
+            </button>
+            {result.persisted ? (
+              <Link
+                href={"/dashboard/" + result.linkId}
+                className="text-sm border border-wire/30 text-wire rounded-md px-4 py-2 hover:bg-wire/10 transition-colors"
+              >
+                View analytics
+              </Link>
+            ) : null}
+          </div>
+
+          <p className="text-xs text-text-muted text-center">
+            {result.persisted
+              ? "Saved to your account — scans are tracked and appear in analytics."
+              : "Sign in to save this QR code and track scans."}
+          </p>
         </div>
       ) : null}
     </div>

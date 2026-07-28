@@ -297,7 +297,49 @@ function DashboardContent() {
               )}
             </>
           ) : (
-            <QuickQrForm />
+            <div className="space-y-6">
+              <QuickQrForm
+                onSaved={function () {
+                  // Refresh the link list so the new QR-sourced link shows up immediately
+                  api.get("/links/mine").then(function (res) {
+                    setLinks(res.data.links);
+                  });
+                }}
+              />
+
+              <div>
+                <h2 className="text-sm font-display font-medium text-white mb-3">
+                  My QR Codes
+                </h2>
+                {(function () {
+                  var qrLinks = links.filter(function (l) {
+                    return l.source === "qr";
+                  });
+                  if (qrLinks.length === 0) {
+                    return (
+                      <p className="text-text-muted text-sm">
+                        No QR codes generated yet.
+                      </p>
+                    );
+                  }
+                  return (
+                    <div className="space-y-3">
+                      {qrLinks.map(function (link) {
+                        return (
+                          <LinkCard
+                            key={link._id}
+                            link={link}
+                            onDelete={handleDelete}
+                            selected={selectedIds.indexOf(link._id) !== -1}
+                            onToggleSelect={toggleSelect}
+                          />
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
           )}
         </div>
       </div>
