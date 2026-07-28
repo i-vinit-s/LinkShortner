@@ -15,6 +15,7 @@ const analyticsRoutes = require("./routes/analytics.routes");
 const reportRoutes = require("./routes/report.routes");
 const qrRoutes = require("./routes/qr.routes");
 const adminRoutes = require("./routes/admin.routes");
+const bioRoutes = require("./routes/bio.routes");
 
 const app = express();
 
@@ -83,5 +84,7 @@ app.use('/api/v1/qr', qrRoutes);
 app.use("/api/v1/reports", reportRoutes);
 
 app.use("/api/v1/admin", adminRoutes);
+
+app.use("/api/v1/bio", bioRoutes);
 
 module.exports = app;

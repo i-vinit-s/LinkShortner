@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 const User = require("../models/User");
 const Link = require("../models/Link");
+const BioPage = require("../models/BioPage");
 const Report = require("../models/Report");
 const ClickEvent = require("../models/ClickEvent");
 const redisClient = require("../config/redis");
@@ -188,5 +189,65 @@ exports.dismissReport = async function (req, res) {
     res.json({ message: "Report dismissed" });
   } catch (err) {
     res.status(500).json({ message: "Failed to dismiss report" });
+  }
+};
+
+exports.listBioPages = async function (req, res) {
+  try {
+    var page = parseInt(req.query.page, 10) || 1;
+    var limit = 20;
+    var search = (req.query.search || "").trim();
+
+    var filter = {};
+    if (search) {
+      filter = { slug: { $regex: search, $options: "i" } };
+    }
+
+    var pages = await BioPage.find(filter)
+      .populate("userId", "name email")
+      .sort({ createdAt: -1 })
+      .skip((page - 1) * limit)
+      .limit(limit);
+
+    var total = await BioPage.countDocuments(filter);
+
+    res.json({
+      pages: pages,
+      total: total,
+      page: page,
+      pages_count: Math.ceil(total / limit),
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Failed to fetch bio pages" });
+  }
+};
+
+exports.toggleBioPagePublish = async function (req, res) {
+  try {
+    var page = await BioPage.findById(req.params.id);
+    if (!page) return res.status(404).json({ message: "Page not found" });
+
+    page.isPublished = !page.isPublished;
+    await page.save();
+
+    res.json({
+      message: page.isPublished ? "Page published" : "Page unpublished",
+      isPublished: page.isPublished,
+    });
+  } catch (err) {
+    res.status(500).json({ message: "Failed to update page" });
+  }
+};
+
+exports.adminDeleteBioPage = async function (req, res) {
+  try {
+    var result = await BioPage.deleteOne({ _id: req.params.id });
+    if (result.deletedCount === 0) {
+      return res.status(404).json({ message: "Page not found" });
+    }
+    res.json({ message: "Page deleted" });
+  } catch (err) {
+    res.status(500).json({ message: "Failed to delete page" });
   }
 };

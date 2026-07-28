@@ -58,6 +58,14 @@ const qrGenLimiter = new RateLimiterRedis({
   duration: 60, // 15 QR generations per minute per IP
 });
 
+const bioViewLimiter = new RateLimiterRedis({
+  storeClient: redisClient,
+  useRedisPackage: true,
+  keyPrefix: "rl:bio-view",
+  points: 60,
+  duration: 60,
+});
+
 function makeMiddleware(limiter, keyFn) {
   return async (req, res, next) => {
     try {
@@ -103,4 +111,5 @@ module.exports = {
   ),
   limitReport: makeMiddleware(reportLimiter, getIp),
   limitQrGenerate: makeMiddleware(qrGenLimiter, getIp),
+  limitBioView: makeMiddleware(bioViewLimiter, getIp),
 };

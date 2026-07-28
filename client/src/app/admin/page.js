@@ -435,6 +435,165 @@ function ReportsTab() {
   );
 }
 
+function BioPagesTab() {
+  var [pages, setPages] = useState([]);
+  var [search, setSearch] = useState("");
+  var [page, setPage] = useState(1);
+  var [pages_count, setPagesCount] = useState(1);
+  var [loading, setLoading] = useState(true);
+
+  var loadPages = async function () {
+    setLoading(true);
+    try {
+      var res = await api.get("/admin/bio-pages", {
+        params: { search: search, page: page },
+      });
+      setPages(res.data.pages);
+      setPagesCount(res.data.pages_count);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(
+    function () {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- loadPages is also called from the search form and toggle/delete handlers; refetching on page change is intended
+      loadPages();
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- loadPages is redefined each render but only `page` should retrigger this fetch
+    [page],
+  );
+
+  var handleSearch = function (e) {
+    e.preventDefault();
+    setPage(1);
+    loadPages();
+  };
+
+  var handleTogglePublish = async function (id) {
+    try {
+      await api.post("/admin/bio-pages/" + id + "/toggle-publish");
+      loadPages();
+    } catch (err) {
+      alert("Failed to update page");
+    }
+  };
+
+  var handleDelete = async function (id) {
+    if (!confirm("Delete this bio page permanently?")) return;
+    try {
+      await api.delete("/admin/bio-pages/" + id);
+      loadPages();
+    } catch (err) {
+      alert("Failed to delete page");
+    }
+  };
+
+  return (
+    <div className="space-y-3">
+      <form onSubmit={handleSearch} className="flex gap-2">
+        <input
+          value={search}
+          onChange={function (e) {
+            setSearch(e.target.value);
+          }}
+          placeholder="Search by slug..."
+          className="flex-1 bg-surface-raised border border-white/10 rounded-md px-3 py-2 text-sm text-white placeholder:text-text-muted focus:outline-none focus:border-signal"
+        />
+        <button
+          type="submit"
+          className="text-sm border border-white/15 rounded-md px-3 py-2 text-white"
+        >
+          Search
+        </button>
+      </form>
+
+      {loading ? (
+        <p className="text-text-muted text-sm">Loading...</p>
+      ) : (
+        <div className="space-y-2">
+          {pages.map(function (p) {
+            return (
+              <div
+                key={p._id}
+                className="bg-surface border border-white/10 rounded-lg p-3 flex items-center justify-between gap-3"
+              >
+                <div className="min-w-0">
+                  <p className="font-mono text-wire text-sm">/u/{p.slug}</p>
+                  <p className="text-text-muted text-xs truncate">
+                    {p.userId ? p.userId.email : "unknown"} &middot; {p.views}{" "}
+                    views
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span
+                    className={
+                      "text-xs px-2 py-0.5 rounded " +
+                      (p.isPublished
+                        ? "bg-led/10 text-led"
+                        : "bg-text-muted/10 text-text-muted")
+                    }
+                  >
+                    {p.isPublished ? "Published" : "Unpublished"}
+                  </span>
+                  <button
+                    onClick={function () {
+                      handleTogglePublish(p._id);
+                    }}
+                    className="text-xs border border-white/15 rounded-md px-2 py-1 text-text-muted hover:text-white"
+                  >
+                    {p.isPublished ? "Unpublish" : "Publish"}
+                  </button>
+                  <button
+                    onClick={function () {
+                      handleDelete(p._id);
+                    }}
+                    className="text-xs border border-danger/30 text-danger rounded-md px-2 py-1 hover:bg-danger/10"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {pages_count > 1 ? (
+        <div className="flex gap-2 justify-center pt-2">
+          <button
+            onClick={function () {
+              setPage(function (p) {
+                return Math.max(1, p - 1);
+              });
+            }}
+            disabled={page <= 1}
+            className="text-xs border border-white/15 rounded-md px-3 py-1 text-text-muted disabled:opacity-40"
+          >
+            Prev
+          </button>
+          <span className="text-xs text-text-muted self-center">
+            Page {page} of {pages_count}
+          </span>
+          <button
+            onClick={function () {
+              setPage(function (p) {
+                return Math.min(pages_count, p + 1);
+              });
+            }}
+            disabled={page >= pages_count}
+            className="text-xs border border-white/15 rounded-md px-3 py-1 text-text-muted disabled:opacity-40"
+          >
+            Next
+          </button>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function AdminDashboard() {
   var [tab, setTab] = useState("overview");
   var [stats, setStats] = useState(null);

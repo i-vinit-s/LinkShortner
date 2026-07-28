@@ -18,4 +18,8 @@ router.get("/reports", admin.listReports);
 router.post("/reports/:id/action", admin.actionReport);
 router.post("/reports/:id/dismiss", admin.dismissReport);
 
+router.get("/bio-pages", admin.listBioPages);
+router.post("/bio-pages/:id/toggle-publish", admin.toggleBioPagePublish);
+router.delete("/bio-pages/:id", admin.adminDeleteBioPage);
+
 module.exports = router;

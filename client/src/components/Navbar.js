@@ -69,6 +69,12 @@ export default function Navbar() {
               {user.name}
             </span>
           )}
+          <Link
+              href="/dashboard/bio"
+              className="text-sm border border-white/15 rounded-md px-3 py-1.5 text-text-muted hover:text-white hover:border-white/30 transition-colors"
+            >
+              Bio Page
+            </Link>
           {user && user.isAdmin ? (
             <Link
               href="/admin"
