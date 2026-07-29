@@ -1,6 +1,7 @@
 const BioPage = require("../models/BioPage");
 const User = require("../models/User");
 const { isValidTheme } = require("../utils/bioPresets");
+const { syncUserPlan } = require("../utils/planSync");
 
 var RESERVED_SLUGS = [
   "admin",
@@ -85,6 +86,7 @@ exports.saveBioPage = async function (req, res) {
     // Enforce the free-tier page limit only when creating a brand new page
     if (!pageId) {
       var user = await User.findById(req.session.userId);
+      await syncUserPlan(user);
       var existingCount = await BioPage.countDocuments({
         userId: req.session.userId,
       });

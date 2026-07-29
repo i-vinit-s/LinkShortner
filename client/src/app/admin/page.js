@@ -594,6 +594,176 @@ function BioPagesTab() {
   );
 }
 
+function BillingTab() {
+  var [overview, setOverview] = useState(null);
+  var [users, setUsers] = useState([]);
+  var [transactions, setTransactions] = useState([]);
+  var [view, setView] = useState("users"); // "users" | "transactions"
+  var [loading, setLoading] = useState(true);
+
+  var loadAll = async function () {
+    setLoading(true);
+    try {
+      var overviewRes = await api.get("/admin/billing/overview");
+      setOverview(overviewRes.data);
+
+      if (view === "users") {
+        var usersRes = await api.get("/admin/billing/users");
+        setUsers(usersRes.data.users);
+      } else {
+        var txRes = await api.get("/admin/billing/transactions");
+        setTransactions(txRes.data.transactions);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(
+    function () {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- loadAll depends on `view`, refetch is intentional here
+      loadAll();
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- loadAll is redefined each render but only `view` should retrigger this fetch
+    [view],
+  );
+
+  return (
+    <div className="space-y-4">
+      {overview ? (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <StatCard label="Active Pro users" value={overview.proActiveCount} />
+          <StatCard
+            label="Est. monthly revenue"
+            value={"Rs." + overview.estimatedMonthlyRevenue}
+          />
+          <StatCard
+            label="Total revenue"
+            value={"Rs." + overview.totalRevenue}
+          />
+          <StatCard
+            label="Cancelling soon"
+            value={overview.cancelledPendingCount}
+          />
+        </div>
+      ) : null}
+
+      <div className="flex gap-2 border-b border-white/10">
+        <button
+          onClick={function () {
+            setView("users");
+          }}
+          className={
+            "text-sm px-3 py-2 border-b-2 " +
+            (view === "users"
+              ? "border-signal text-white"
+              : "border-transparent text-text-muted")
+          }
+        >
+          Subscribers
+        </button>
+        <button
+          onClick={function () {
+            setView("transactions");
+          }}
+          className={
+            "text-sm px-3 py-2 border-b-2 " +
+            (view === "transactions"
+              ? "border-signal text-white"
+              : "border-transparent text-text-muted")
+          }
+        >
+          Transactions
+        </button>
+      </div>
+
+      {loading ? (
+        <p className="text-text-muted text-sm">Loading...</p>
+      ) : view === "users" ? (
+        <div className="space-y-2">
+          {users.map(function (u) {
+            var statusLabel =
+              u.plan === "pro" && u.cancelAtPeriodEnd
+                ? "Cancelling"
+                : u.plan === "pro"
+                  ? "Active"
+                  : u.subscriptionStatus === "past_due"
+                    ? "Past due"
+                    : "Free";
+            var statusClass =
+              statusLabel === "Active"
+                ? "bg-led/10 text-led"
+                : statusLabel === "Cancelling"
+                  ? "bg-signal/10 text-signal"
+                  : statusLabel === "Past due"
+                    ? "bg-danger/10 text-danger"
+                    : "bg-text-muted/10 text-text-muted";
+            return (
+              <div
+                key={u._id}
+                className="bg-surface border border-white/10 rounded-lg p-3 flex items-center justify-between gap-3"
+              >
+                <div className="min-w-0">
+                  <p className="text-white text-sm truncate">{u.name}</p>
+                  <p className="text-text-muted text-xs truncate">{u.email}</p>
+                </div>
+                <div className="text-right shrink-0">
+                  <span
+                    className={"text-xs px-2 py-0.5 rounded " + statusClass}
+                  >
+                    {statusLabel}
+                  </span>
+                  {u.currentPeriodEnd ? (
+                    <p className="text-text-muted text-xs mt-1">
+                      {u.cancelAtPeriodEnd ? "Ends " : "Renews "}
+                      {new Date(u.currentPeriodEnd).toLocaleDateString()}
+                    </p>
+                  ) : null}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {transactions.map(function (t) {
+            return (
+              <div
+                key={t._id}
+                className="bg-surface border border-white/10 rounded-lg p-3 flex items-center justify-between gap-3"
+              >
+                <div className="min-w-0">
+                  <p className="text-white text-sm truncate">
+                    {t.userId ? t.userId.email : "unknown"}
+                  </p>
+                  <p className="text-text-muted text-xs">
+                    {new Date(t.createdAt).toLocaleString()}
+                  </p>
+                </div>
+                <div className="text-right shrink-0">
+                  <p className="text-white text-sm font-mono">
+                    Rs.{(t.amount / 100).toFixed(2)}
+                  </p>
+                  <span
+                    className={
+                      "text-xs " +
+                      (t.status === "captured" ? "text-led" : "text-danger")
+                    }
+                  >
+                    {t.status}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function AdminDashboard() {
   var [tab, setTab] = useState("overview");
   var [stats, setStats] = useState(null);
@@ -615,6 +785,8 @@ function AdminDashboard() {
     { key: "users", label: "Users" },
     { key: "links", label: "Links" },
     { key: "reports", label: "Reports" },
+    { key: "bio", label: "Bio Pages" },
+    { key: 'billing', label: 'Billing' },
   ];
 
   return (
@@ -668,6 +840,8 @@ function AdminDashboard() {
         {tab === "users" ? <UsersTab /> : null}
         {tab === "links" ? <LinksTab /> : null}
         {tab === "reports" ? <ReportsTab /> : null}
+        {tab === "bio" ? <BioPagesTab /> : null}
+        {tab === "billing" ? <BillingTab /> : null}
       </div>
     </div>
   );

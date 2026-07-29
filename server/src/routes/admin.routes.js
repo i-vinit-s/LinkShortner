@@ -22,4 +22,8 @@ router.get("/bio-pages", admin.listBioPages);
 router.post("/bio-pages/:id/toggle-publish", admin.toggleBioPagePublish);
 router.delete("/bio-pages/:id", admin.adminDeleteBioPage);
 
+router.get("/billing/overview", admin.getBillingOverview);
+router.get("/billing/users", admin.listBillingUsers);
+router.get("/billing/transactions", admin.listTransactions);
+
 module.exports = router;

@@ -25,6 +25,7 @@ const userSchema = new mongoose.Schema(
       default: "none",
     },
     currentPeriodEnd: { type: Date, default: null },
+    cancelAtPeriodEnd: { type: Boolean, default: false },
   },
   { timestamps: true },
 );

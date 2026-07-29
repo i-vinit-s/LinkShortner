@@ -5,6 +5,7 @@ const BioPage = require("../models/BioPage");
 const Report = require("../models/Report");
 const ClickEvent = require("../models/ClickEvent");
 const redisClient = require("../config/redis");
+const Transaction = require("../models/Transaction");
 
 // --- Dashboard summary ---
 exports.getStats = async function (req, res) {
@@ -249,5 +250,98 @@ exports.adminDeleteBioPage = async function (req, res) {
     res.json({ message: "Page deleted" });
   } catch (err) {
     res.status(500).json({ message: "Failed to delete page" });
+  }
+};
+
+exports.getBillingOverview = async function (req, res) {
+  try {
+    var proActiveCount = await User.countDocuments({
+      plan: "pro",
+      subscriptionStatus: "active",
+    });
+    var pastDueCount = await User.countDocuments({
+      subscriptionStatus: "past_due",
+    });
+    var cancelledPendingCount = await User.countDocuments({
+      cancelAtPeriodEnd: true,
+    });
+
+    var revenueAgg = await Transaction.aggregate([
+      { $match: { status: "captured" } },
+      { $group: { _id: null, total: { $sum: "$amount" } } },
+    ]);
+    var totalRevenuePaise = revenueAgg.length > 0 ? revenueAgg[0].total : 0;
+
+    var lastPayment = await Transaction.findOne({ status: "captured" }).sort({
+      createdAt: -1,
+    });
+    var pricePerCyclePaise = lastPayment ? lastPayment.amount : 0;
+
+    res.json({
+      proActiveCount: proActiveCount,
+      pastDueCount: pastDueCount,
+      cancelledPendingCount: cancelledPendingCount,
+      totalRevenue: totalRevenuePaise / 100,
+      estimatedMonthlyRevenue: (proActiveCount * pricePerCyclePaise) / 100,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Failed to fetch billing overview" });
+  }
+};
+
+exports.listBillingUsers = async function (req, res) {
+  try {
+    var page = parseInt(req.query.page, 10) || 1;
+    var limit = 20;
+    var planFilter = req.query.plan || "all";
+
+    var filter = {};
+    if (planFilter !== "all") filter.plan = planFilter;
+
+    var users = await User.find(filter)
+      .select(
+        "name email plan subscriptionStatus currentPeriodEnd cancelAtPeriodEnd",
+      )
+      .sort({ currentPeriodEnd: -1 })
+      .skip((page - 1) * limit)
+      .limit(limit);
+
+    var total = await User.countDocuments(filter);
+
+    res.json({
+      users: users,
+      total: total,
+      page: page,
+      pages: Math.ceil(total / limit),
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Failed to fetch billing users" });
+  }
+};
+
+exports.listTransactions = async function (req, res) {
+  try {
+    var page = parseInt(req.query.page, 10) || 1;
+    var limit = 20;
+
+    var transactions = await Transaction.find()
+      .populate("userId", "name email")
+      .sort({ createdAt: -1 })
+      .skip((page - 1) * limit)
+      .limit(limit);
+
+    var total = await Transaction.countDocuments();
+
+    res.json({
+      transactions: transactions,
+      total: total,
+      page: page,
+      pages: Math.ceil(total / limit),
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Failed to fetch transactions" });
   }
 };
