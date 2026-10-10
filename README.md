@@ -10,6 +10,7 @@ Long URLs go in, short trackable ones come out — with password protection, exp
 
 - [ShortLink](#shortlink)
   - [Table of Contents](#table-of-contents)
+  - [Screenshots](#screenshots)
   - [Features](#features)
     - [Authentication](#authentication)
     - [Link Management](#link-management)
@@ -52,6 +53,26 @@ Long URLs go in, short trackable ones come out — with password protection, exp
   - [License](#license)
 
 ---
+
+## Screenshots
+
+Dark, fully responsive UI. Images are in [`docs/screenshots`](docs/screenshots).
+
+| Home — anonymous shortening | Dashboard — links, filters, bulk actions |
+|---|---|
+| <img src="docs/screenshots/home.png" alt="Home page with anonymous link shortening" width="100%"> | <img src="docs/screenshots/dashboard.png" alt="Dashboard with link list, search and filters" width="100%"> |
+
+| Link analytics | QR code modal |
+|---|---|
+| <img src="docs/screenshots/analytics.png" alt="Per-link analytics: clicks over time, referrers, devices, countries" width="100%"> | <img src="docs/screenshots/qr-modal.png" alt="QR code modal with download and copy" width="100%"> |
+
+| Bio page builder | Public bio page |
+|---|---|
+| <img src="docs/screenshots/bio-builder.png" alt="Bio page builder with live preview and theme picker" width="100%"> | <img src="docs/screenshots/bio-public.png" alt="Public link-in-bio page" width="100%"> |
+
+| Pricing | Admin — users |
+|---|---|
+| <img src="docs/screenshots/pricing.png" alt="Free and Pro pricing page" width="100%"> | <img src="docs/screenshots/admin-users.png" alt="Admin users tab with status dots, PRO tag and ban button" width="100%"> |
 
 ## Features
 
