@@ -76,6 +76,12 @@ exports.verifyOtp = async (req, res) => {
       return res.status(400).json({ message: "Invalid or expired code" });
     }
 
+    if (user.isBanned) {
+      return res
+        .status(403)
+        .json({ message: "Your account has been suspended" });
+    }
+
     if (user.otpExpiresAt < new Date()) {
       return res
         .status(400)
@@ -151,13 +157,11 @@ exports.login = async (req, res) => {
     }
 
     if (!user.verified) {
-      return res
-        .status(403)
-        .json({
-          message: "Please verify your email before logging in",
-          unverified: true,
-          email: user.email,
-        });
+      return res.status(403).json({
+        message: "Please verify your email before logging in",
+        unverified: true,
+        email: user.email,
+      });
     }
 
     req.session.userId = user._id;

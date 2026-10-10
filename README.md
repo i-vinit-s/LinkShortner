@@ -8,23 +8,48 @@ Long URLs go in, short trackable ones come out — with password protection, exp
 
 ## Table of Contents
 
-- [Features](#features)
-- [Tech Stack](#tech-stack)
-- [Architecture](#architecture)
-- [Project Structure](#project-structure)
-- [Getting Started](#getting-started)
-  - [Prerequisites](#prerequisites)
-  - [Backend Setup](#backend-setup)
-  - [Frontend Setup](#frontend-setup)
-  - [Creating your first admin account](#creating-your-first-admin-account)
-  - [Razorpay setup](#razorpay-setup)
-- [Environment Variables](#environment-variables)
-- [API Reference](#api-reference)
-- [Security Notes](#security-notes)
-- [Legal & Trust](#legal--trust)
-- [Roadmap](#roadmap)
-- [Contributing](#contributing)
-- [License](#license)
+- [ShortLink](#shortlink)
+  - [Table of Contents](#table-of-contents)
+  - [Features](#features)
+    - [Authentication](#authentication)
+    - [Link Management](#link-management)
+    - [Bio Pages](#bio-pages)
+    - [Billing \& Subscriptions](#billing--subscriptions)
+    - [Redirect Engine](#redirect-engine)
+    - [Analytics](#analytics)
+    - [Admin Dashboard](#admin-dashboard)
+    - [Trust \& Safety](#trust--safety)
+    - [Reliability \& Abuse Prevention](#reliability--abuse-prevention)
+    - [UI/UX](#uiux)
+  - [Tech Stack](#tech-stack)
+  - [Architecture](#architecture)
+  - [Project Structure](#project-structure)
+  - [Getting Started](#getting-started)
+    - [Prerequisites](#prerequisites)
+    - [Backend Setup](#backend-setup)
+    - [Frontend Setup](#frontend-setup)
+    - [Creating your first admin account](#creating-your-first-admin-account)
+    - [Razorpay setup](#razorpay-setup)
+    - [Uptime monitoring (recommended for production)](#uptime-monitoring-recommended-for-production)
+  - [Environment Variables](#environment-variables)
+    - [`server/.env`](#serverenv)
+    - [`client/.env.local`](#clientenvlocal)
+  - [API Reference](#api-reference)
+    - [Auth](#auth)
+    - [Links](#links)
+    - [Resolving Short Links](#resolving-short-links)
+    - [Analytics](#analytics-1)
+    - [QR Codes](#qr-codes)
+    - [Bio Pages](#bio-pages-1)
+    - [Billing \& Subscriptions](#billing--subscriptions-1)
+    - [Reports](#reports)
+    - [Admin](#admin)
+    - [Health](#health)
+  - [Security Notes](#security-notes)
+  - [Legal \& Trust](#legal--trust)
+  - [Roadmap](#roadmap)
+  - [Contributing](#contributing)
+  - [License](#license)
 
 ---
 
@@ -88,7 +113,7 @@ Long URLs go in, short trackable ones come out — with password protection, exp
 ### Admin Dashboard
 - Gated behind an `isAdmin` flag and a dedicated `requireAdmin` middleware, layered on top of session auth (no self-service way to become an admin — promotion happens directly in the database)
 - **Overview** — live counts of total users, total/active links, total clicks, and pending reports
-- **Users** — searchable, paginated list; ban/reinstate any non-admin account (admins cannot be banned or ban other admins)
+- **Users** — searchable, paginated list; ban/reinstate any non-admin account (admins cannot be banned or ban other admins); status badges show Active, Unverified, or Banned, and banned users are logged out immediately
 - **Links** — searchable, paginated list across all users; deactivate/reactivate any link
 - **Reports** — review, action (deactivate the reported link), or dismiss abuse reports
 - **Bio Pages** — searchable, paginated list of every user's bio pages; publish/unpublish or permanently delete any page
@@ -259,7 +284,7 @@ The built-in keep-alive ping only prevents free-tier host spin-down while the pr
 
 1. Sign up at [UptimeRobot](https://uptimerobot.com) (free tier supports 5-minute checks).
 2. Add a new **HTTP(s)** monitor pointing at your deployed API's `/health` endpoint.
-3. Set the expected keyword to `"status":"ok"` so it catches partial failures (e.g. Redis down but server up).
+3. Set the expected keyword to `"redis":"connected"` and add a second monitor for `"mongo":"connected"`.
 4. Configure alert contacts (email, Slack, or webhook) to be notified on downtime.
 
 ---
@@ -278,7 +303,7 @@ The built-in keep-alive ping only prevents free-tier host spin-down while the pr
 | `APP_URL` | The domain your short links resolve through (usually the frontend); also used as the self-ping target for the keep-alive utility |
 | `NODE_ENV` | `development` or `production` |
 | `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` / `SMTP_FROM` | Outbound email config for OTP delivery |
-| `SAFE_BROWSING_API_KEY` | (Optional) Google Safe Browsing key to flag malicious destination URLs |
+| `SAFE_BROWSING_API_KEY` | Google Safe Browsing key. Required in production (the app fails closed without it), optional in development. Google limits this API to non-commercial use; use Web Risk for a paid product |
 | `RAZORPAY_KEY_ID` | Razorpay API Key ID |
 | `RAZORPAY_KEY_SECRET` | Razorpay API Key Secret |
 | `RAZORPAY_PLAN_ID` | Razorpay Subscription Plan ID |
@@ -374,7 +399,7 @@ All routes below require an authenticated session **and** `isAdmin: true`.
 |---|---|---|
 | GET | `/admin/stats` | Overview counts (users, links, clicks, pending reports) |
 | GET | `/admin/users` | Paginated, searchable user list |
-| POST | `/admin/users/:id/toggle-ban` | Ban or reinstate a non-admin user |
+| POST | `/admin/users/:id/toggle-ban` | Ban or reinstate a non-admin user (sets isBanned and a Redis flag; active sessions end on their next request) |
 | GET | `/admin/links` | Paginated, searchable list of all links |
 | POST | `/admin/links/:id/toggle-active` | Deactivate or reactivate any link |
 | GET | `/admin/reports` | List reports, filterable by status |
@@ -415,6 +440,7 @@ All routes below require an authenticated session **and** `isAdmin: true`.
 **Known limitations:**
 - "Resuming" a cancelled subscription clears the app's own tracking flag rather than reversing the cancellation with Razorpay directly, since not all cancellation schedules can be undone via the API — the underlying subscription was never told to stop billing in the first place (only scheduled to at cycle end), so this is safe, but it's a simplification worth knowing about.
 - The internal keep-alive ping only prevents sleep while the process is already running; it cannot wake a sleeping instance or alert anyone if the process crashes. An external uptime monitor is the more robust solution for production use.
+- Ban flags live in Redis. If Redis is flushed, already-logged-in banned users are not blocked until the flags are restored (login stays blocked via the database).
 
 ---
 

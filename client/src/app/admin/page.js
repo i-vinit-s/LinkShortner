@@ -24,6 +24,7 @@ function UsersTab() {
   var [page, setPage] = useState(1);
   var [pages, setPages] = useState(1);
   var [loading, setLoading] = useState(true);
+  var [busyId, setBusyId] = useState(null);
 
   var loadUsers = async function () {
     setLoading(true);
@@ -55,16 +56,35 @@ function UsersTab() {
     loadUsers();
   };
 
-  var handleToggleBan = async function (id) {
+  var handleToggleBan = async function (user) {
+    if (busyId) return;
+
+    if (!user.isBanned) {
+      var confirmed = window.confirm(
+        "Ban " +
+          user.email +
+          "? They will be logged out immediately and cannot log in until reinstated.",
+      );
+      if (!confirmed) return;
+    }
+
+    setBusyId(user._id);
     try {
-      await api.post("/admin/users/" + id + "/toggle-ban");
-      loadUsers();
+      var res = await api.post("/admin/users/" + user._id + "/toggle-ban");
+      // Update just this row from the server's answer instead of refetching the whole list
+      setUsers(function (prev) {
+        return prev.map(function (u) {
+          return u._id === user._id ? { ...u, isBanned: res.data.isBanned } : u;
+        });
+      });
     } catch (err) {
       alert(
         err.response && err.response.data && err.response.data.message
           ? err.response.data.message
           : "Failed to update user",
       );
+    } finally {
+      setBusyId(null);
     }
   };
 
@@ -110,21 +130,37 @@ function UsersTab() {
                   <span
                     className={
                       "text-xs px-2 py-0.5 rounded " +
-                      (u.verified
-                        ? "bg-led/10 text-led"
-                        : "bg-danger/10 text-danger")
+                      (u.isBanned
+                        ? "bg-danger/10 text-danger"
+                        : u.verified
+                          ? "bg-led/10 text-led"
+                          : "bg-white/5 text-text-muted")
                     }
                   >
-                    {u.verified ? "Active" : "Banned/Unverified"}
+                    {u.isBanned
+                      ? "Banned"
+                      : u.verified
+                        ? "Active"
+                        : "Unverified"}
                   </span>
                   {!u.isAdmin ? (
                     <button
+                      disabled={busyId === u._id}
                       onClick={function () {
-                        handleToggleBan(u._id);
+                        handleToggleBan(u);
                       }}
-                      className="text-xs border border-white/15 rounded-md px-2 py-1 text-text-muted hover:text-white"
+                      className={
+                        "text-xs border rounded-md px-2 py-1 disabled:opacity-50 " +
+                        (u.isBanned
+                          ? "border-white/15 text-text-muted hover:text-white"
+                          : "border-danger/40 text-danger hover:bg-danger/10")
+                      }
                     >
-                      {u.verified ? "Ban" : "Reinstate"}
+                      {busyId === u._id
+                        ? "..."
+                        : u.isBanned
+                          ? "Reinstate"
+                          : "Ban"}
                     </button>
                   ) : null}
                 </div>
