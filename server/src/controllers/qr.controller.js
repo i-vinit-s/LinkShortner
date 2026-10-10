@@ -3,6 +3,7 @@ const Link = require("../models/Link");
 const redisClient = require("../config/redis");
 const { encode } = require("../utils/base62");
 const { getNextCounter } = require("../utils/counter");
+const { checkUrlSafety } = require("../utils/safeBrowsing");
 
 exports.getQrCode = async (req, res) => {
   try {
@@ -52,6 +53,24 @@ exports.generateQrFromUrl = async (req, res) => {
       return res
         .status(400)
         .json({ message: "Only http/https URLs are allowed" });
+    }
+
+    var safetyCheck = await checkUrlSafety(url);
+    if (safetyCheck.malicious) {
+      return res
+        .status(400)
+        .json({
+          message:
+            "This URL has been flagged as unsafe and cannot be used",
+        });
+    }
+    if (safetyCheck.unavailable) {
+      return res
+        .status(503)
+        .json({
+          message:
+            "URL safety check is temporarily unavailable. Please try again later.",
+        });
     }
 
     var isAuthenticated = !!req.session.userId;

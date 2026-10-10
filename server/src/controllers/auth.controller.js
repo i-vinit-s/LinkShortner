@@ -144,6 +144,12 @@ exports.login = async (req, res) => {
       return res.status(401).json({ message: "Invalid credentials" });
     }
 
+    if (user.isBanned) {
+      return res
+        .status(403)
+        .json({ message: "Your account has been suspended" });
+    }
+
     if (!user.verified) {
       return res
         .status(403)

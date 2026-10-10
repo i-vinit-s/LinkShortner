@@ -4,7 +4,7 @@ const Link = require("../models/Link");
 const redisClient = require("../config/redis");
 const { encode } = require("../utils/base62");
 const { getNextCounter } = require("../utils/counter");
-const { isUrlMalicious } = require("../utils/safeBrowsing");
+const { checkUrlSafety } = require("../utils/safeBrowsing");
 const { generateRandomCode } = require("../utils/randomCode");
 
 const RESERVED_ALIASES = [
@@ -40,13 +40,21 @@ exports.createLink = async (req, res) => {
         .json({ message: "Only http/https URLs are allowed" });
     }
 
-    var malicious = await isUrlMalicious(longUrl);
-    if (malicious) {
+    var safetyCheck = await checkUrlSafety(longUrl);
+    if (safetyCheck.malicious) {
       return res
         .status(400)
         .json({
           message:
             "This URL has been flagged as unsafe and cannot be shortened",
+        });
+    }
+    if (safetyCheck.unavailable) {
+      return res
+        .status(503)
+        .json({
+          message:
+            "URL safety check is temporarily unavailable. Please try again later.",
         });
     }
 

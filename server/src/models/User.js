@@ -14,6 +14,7 @@ const userSchema = new mongoose.Schema(
     password: { type: String, required: true },
     verified: { type: Boolean, default: false },
     isAdmin: { type: Boolean, default: false },
+    isBanned: { type: Boolean, default: false },
     otpHash: { type: String, default: null },
     otpExpiresAt: { type: Date, default: null },
     plan: { type: String, enum: ["free", "pro"], default: "free" },

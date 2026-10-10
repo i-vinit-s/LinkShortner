@@ -75,12 +75,20 @@ exports.toggleUserBan = async function (req, res) {
       return res.status(400).json({ message: "Cannot ban an admin account" });
     }
 
-    user.verified = !user.verified; // reuse `verified` as an on/off gate: unverifying locks them out of login
+    user.isBanned = !user.isBanned;
     await user.save();
 
+    if (user.isBanned) {
+      // Set a Redis flag so requireAuth rejects them on their very next request
+      await redisClient.set("banned:" + user._id, "1");
+    } else {
+      // Clear the ban flag on reinstatement
+      await redisClient.del("banned:" + user._id);
+    }
+
     res.json({
-      message: user.verified ? "User reinstated" : "User banned",
-      verified: user.verified,
+      message: user.isBanned ? "User banned" : "User reinstated",
+      isBanned: user.isBanned,
     });
   } catch (err) {
     console.error(err);

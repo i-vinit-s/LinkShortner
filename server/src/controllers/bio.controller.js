@@ -2,6 +2,7 @@ const BioPage = require("../models/BioPage");
 const User = require("../models/User");
 const { isValidTheme } = require("../utils/bioPresets");
 const { syncUserPlan } = require("../utils/planSync");
+const { checkUrlSafety } = require("../utils/safeBrowsing");
 
 var RESERVED_SLUGS = [
   "admin",
@@ -137,6 +138,27 @@ exports.saveBioPage = async function (req, res) {
         label: String(l.label).trim().slice(0, 40),
         url: urlStr,
       });
+    }
+
+    // Check all bio link URLs against Safe Browsing
+    for (var j = 0; j < cleanLinks.length; j++) {
+      var safetyCheck = await checkUrlSafety(cleanLinks[j].url);
+      if (safetyCheck.malicious) {
+        return res
+          .status(400)
+          .json({
+            message:
+              'Link "' + cleanLinks[j].label + '" points to a URL flagged as unsafe',
+          });
+      }
+      if (safetyCheck.unavailable) {
+        return res
+          .status(503)
+          .json({
+            message:
+              "URL safety check is temporarily unavailable. Please try again later.",
+          });
+      }
     }
 
     var payload = {

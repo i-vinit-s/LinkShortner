@@ -226,7 +226,7 @@ curl http://localhost:5000/health
 ```bash
 cd client
 npm install
-cp .env.local.example .env.local   # then fill in your own values
+cp .env.example .env.local   # then fill in your own values
 npm run dev
 ```
 
@@ -252,6 +252,15 @@ Log out and back in afterward so your session picks up the updated flag, then vi
 4. Copy the Key ID, Key Secret, Plan ID, and the webhook secret Razorpay generates into your `server/.env` (see below).
 
 Razorpay's published test card numbers can be used to simulate successful/failed payments without moving real money.
+
+### Uptime monitoring (recommended for production)
+
+The built-in keep-alive ping only prevents free-tier host spin-down while the process is already running — it cannot wake a stopped instance or alert you to downtime. For production, set up an external monitor:
+
+1. Sign up at [UptimeRobot](https://uptimerobot.com) (free tier supports 5-minute checks).
+2. Add a new **HTTP(s)** monitor pointing at your deployed API's `/health` endpoint.
+3. Set the expected keyword to `"status":"ok"` so it catches partial failures (e.g. Redis down but server up).
+4. Configure alert contacts (email, Slack, or webhook) to be notified on downtime.
 
 ---
 
@@ -400,10 +409,10 @@ All routes below require an authenticated session **and** `isAdmin: true`.
 - Bio page theme colors are validated as strict 6-digit hex values server-side before being stored, since they're later rendered directly as inline CSS on public pages.
 - Razorpay webhook requests are verified using an HMAC signature check against the raw request body before any event is processed; requests with an invalid signature are rejected outright.
 - Billing mutations (`create-subscription`, `cancel`, `resume`) require an authenticated session; only the webhook endpoint is exempt, and it authenticates via signature instead.
-- Payment card details are never handled or stored by this application — Razorpay's hosted checkout handles all card data directly.
+- Banning a user now immediately invalidates active sessions via a Redis ban flag (`banned:<userId>`) checked by the auth middleware — banned users are rejected on their very next request.
+- Destination URLs are checked against Google Safe Browsing on link creation, QR generation, and bio page saves. In production, the check **fails closed** if the API key is missing or the API is unreachable.
 
 **Known limitations:**
-- Banning a user blocks future logins but does not invalidate an already-active session for that user. Immediate mid-session revocation would require indexing sessions by user ID in Redis.
 - "Resuming" a cancelled subscription clears the app's own tracking flag rather than reversing the cancellation with Razorpay directly, since not all cancellation schedules can be undone via the API — the underlying subscription was never told to stop billing in the first place (only scheduled to at cycle end), so this is safe, but it's a simplification worth knowing about.
 - The internal keep-alive ping only prevents sleep while the process is already running; it cannot wake a sleeping instance or alert anyone if the process crashes. An external uptime monitor is the more robust solution for production use.
 
@@ -431,7 +440,7 @@ Ideas being considered for future contributions:
 - [ ] Webhooks for real-time click notifications (distinct from the Razorpay billing webhooks already in place)
 - [ ] Team/workspace support with shared link collections
 - [ ] Real-time click feed via WebSockets/SSE
-- [ ] Session revocation on ban (invalidate active sessions immediately, not just future logins)
+- [x] Session revocation on ban (invalidate active sessions immediately, not just future logins)
 - [ ] Drag-and-drop reordering for bio page links (currently up/down buttons)
 - [ ] Per-link click tracking within bio pages (currently page-level view count only)
 
