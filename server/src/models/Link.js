@@ -17,6 +17,12 @@ const linkSchema = new mongoose.Schema(
     isActive: { type: Boolean, default: true },
     tags: { type: [String], default: [] },
     source: { type: String, enum: ["dashboard", "qr"], default: "dashboard" },
+    // Who switched the link off: "user" (own deactivate), "admin" (moderation), null (legacy / expired)
+    deactivatedBy: {
+      type: String,
+      enum: ["user", "admin", null],
+      default: null,
+    },
   },
   { timestamps: true },
 );

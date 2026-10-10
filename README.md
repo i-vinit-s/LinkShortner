@@ -363,6 +363,7 @@ All routes are prefixed with `/api/v1` unless noted otherwise.
 | GET | `/links/tags` | List all distinct tags the user has used |
 | POST | `/links/bulk-delete` | Deactivate multiple links at once |
 | DELETE | `/links/:id` | Deactivate a single link |
+| POST | /links/:id/reactivate | Reactivate a link the user deactivated (not admin-disabled or expired links; destination is re-checked with Safe Browsing) |
 
 ### Resolving Short Links
 

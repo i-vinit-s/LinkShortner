@@ -139,6 +139,7 @@ exports.adminDeactivateLink = async function (req, res) {
     if (!link) return res.status(404).json({ message: "Link not found" });
 
     link.isActive = !link.isActive;
+    link.deactivatedBy = link.isActive ? null : "admin";
     await link.save();
     await redisClient.del("short:" + link.shortCode);
 
@@ -173,6 +174,7 @@ exports.actionReport = async function (req, res) {
 
     if (report.linkId) {
       report.linkId.isActive = false;
+      report.linkId.deactivatedBy = "admin";
       await report.linkId.save();
       await redisClient.del("short:" + report.linkId.shortCode);
     }

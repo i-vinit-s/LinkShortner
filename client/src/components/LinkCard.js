@@ -23,6 +23,7 @@ function OdometerCount(props) {
 export default function LinkCard(props) {
   var link = props.link;
   var onDelete = props.onDelete;
+  var onReactivate = props.onReactivate;
   var selected = props.selected;
   var onToggleSelect = props.onToggleSelect;
 
@@ -137,14 +138,32 @@ export default function LinkCard(props) {
         >
           Analytics
         </Link>
-        <button
-          onClick={function () {
-            onDelete(link._id);
-          }}
-          className="text-sm border border-danger/30 text-danger rounded-md px-3 py-1.5 hover:bg-danger/10 transition-colors"
-        >
-          Delete
-        </button>
+        {link.isActive ? (
+          <button
+            onClick={function () {
+              onDelete(link._id);
+            }}
+            className="text-sm border border-danger/30 text-danger rounded-md px-3 py-1.5 hover:bg-danger/10 transition-colors"
+          >
+            Deactivate
+          </button>
+        ) : !isExpired && link.deactivatedBy === "user" ? (
+          <button
+            onClick={function () {
+              onReactivate(link._id);
+            }}
+            className="text-sm border border-led/40 text-led rounded-md px-3 py-1.5 hover:bg-led/10 transition-colors"
+          >
+            Activate
+          </button>
+        ) : link.deactivatedBy === "admin" ? (
+          <span
+            className="text-xs text-text-muted px-2"
+            title="This link was disabled by an administrator"
+          >
+            Disabled by admin
+          </span>
+        ) : null}
       </div>
 
       {showQr ? (

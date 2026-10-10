@@ -47,24 +47,52 @@ function DashboardContent() {
     });
   };
 
-  var handleDelete = async function (id) {
-    if (!confirm("Deactivate this link?")) return;
-    try {
-      await api.delete("/links/" + id);
-      setLinks(function (prev) {
-        return prev.filter(function (l) {
-          return l._id !== id;
+    var handleDelete = async function (id) {
+      if (!confirm("Deactivate this link? You can activate it again later."))
+        return;
+      try {
+        await api.delete("/links/" + id);
+        // Keep the link in the list (greyed out) so it can be activated again
+        setLinks(function (prev) {
+          return prev.map(function (l) {
+            return l._id === id
+              ? { ...l, isActive: false, deactivatedBy: "user" }
+              : l;
+          });
         });
-      });
-      setSelectedIds(function (prev) {
-        return prev.filter(function (sid) {
-          return sid !== id;
+        setSelectedIds(function (prev) {
+          return prev.filter(function (sid) {
+            return sid !== id;
+          });
         });
-      });
-    } catch (err) {
-      console.error(err);
-    }
-  };
+      } catch (err) {
+        console.error(err);
+        alert(
+          err.response && err.response.data && err.response.data.message
+            ? err.response.data.message
+            : "Failed to deactivate link",
+        );
+      }
+    };
+
+    var handleReactivate = async function (id) {
+      try {
+        await api.post("/links/" + id + "/reactivate");
+        setLinks(function (prev) {
+          return prev.map(function (l) {
+            return l._id === id
+              ? { ...l, isActive: true, deactivatedBy: null }
+              : l;
+          });
+        });
+      } catch (err) {
+        alert(
+          err.response && err.response.data && err.response.data.message
+            ? err.response.data.message
+            : "Failed to activate link",
+        );
+      }
+    };
 
   var toggleSelect = function (id) {
     setSelectedIds(function (prev) {
@@ -86,8 +114,10 @@ function DashboardContent() {
     try {
       await api.post("/links/bulk-delete", { ids: selectedIds });
       setLinks(function (prev) {
-        return prev.filter(function (l) {
-          return selectedIds.indexOf(l._id) === -1;
+        return prev.map(function (l) {
+          return selectedIds.indexOf(l._id) !== -1 && l.isActive
+            ? { ...l, isActive: false, deactivatedBy: "user" }
+            : l;
         });
       });
       setSelectedIds([]);
@@ -288,6 +318,7 @@ function DashboardContent() {
                             key={link._id}
                             link={link}
                             onDelete={handleDelete}
+                            onReactivate={handleReactivate}
                             selected={selectedIds.indexOf(link._id) !== -1}
                             onToggleSelect={toggleSelect}
                           />
@@ -332,6 +363,7 @@ function DashboardContent() {
                             key={link._id}
                             link={link}
                             onDelete={handleDelete}
+                            onReactivate={handleReactivate}
                             selected={selectedIds.indexOf(link._id) !== -1}
                             onToggleSelect={toggleSelect}
                           />

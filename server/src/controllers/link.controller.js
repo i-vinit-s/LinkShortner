@@ -42,20 +42,15 @@ exports.createLink = async (req, res) => {
 
     var safetyCheck = await checkUrlSafety(longUrl);
     if (safetyCheck.malicious) {
-      return res
-        .status(400)
-        .json({
-          message:
-            "This URL has been flagged as unsafe and cannot be shortened",
-        });
+      return res.status(400).json({
+        message: "This URL has been flagged as unsafe and cannot be shortened",
+      });
     }
     if (safetyCheck.unavailable) {
-      return res
-        .status(503)
-        .json({
-          message:
-            "URL safety check is temporarily unavailable. Please try again later.",
-        });
+      return res.status(503).json({
+        message:
+          "URL safety check is temporarily unavailable. Please try again later.",
+      });
     }
 
     var linkData = {
@@ -88,11 +83,9 @@ exports.createLink = async (req, res) => {
       if (customAlias) {
         var alias = customAlias.trim();
         if (!/^[a-zA-Z0-9_-]{3,20}$/.test(alias)) {
-          return res
-            .status(400)
-            .json({
-              message: "Alias must be 3-20 chars, letters/numbers/-/_ only",
-            });
+          return res.status(400).json({
+            message: "Alias must be 3-20 chars, letters/numbers/-/_ only",
+          });
         }
         if (RESERVED_ALIASES.includes(alias.toLowerCase())) {
           return res.status(400).json({ message: "This alias is reserved" });
@@ -142,11 +135,9 @@ exports.createLink = async (req, res) => {
       }
 
       if (!link) {
-        return res
-          .status(500)
-          .json({
-            message: "Could not generate a unique short code, please try again",
-          });
+        return res.status(500).json({
+          message: "Could not generate a unique short code, please try again",
+        });
       }
     }
 
@@ -196,13 +187,73 @@ exports.deleteLink = async (req, res) => {
     });
     if (!link) return res.status(404).json({ message: "Link not found" });
 
+    // Don't re-label a link that is already off (e.g. disabled by an admin)
+    if (!link.isActive) {
+      return res.status(400).json({ message: "Link is already deactivated" });
+    }
+
     link.isActive = false; // soft delete — keeps analytics history intact
+    link.deactivatedBy = "user";
     await link.save();
     await redisClient.del(`short:${link.shortCode}`);
 
     res.json({ message: "Link deactivated" });
   } catch (err) {
     res.status(500).json({ message: "Failed to delete link" });
+  }
+};
+
+exports.reactivateLink = async (req, res) => {
+  try {
+    const link = await Link.findOne({
+      _id: req.params.id,
+      userId: req.session.userId,
+    });
+    if (!link) return res.status(404).json({ message: "Link not found" });
+
+    if (link.isActive) {
+      return res.status(400).json({ message: "Link is already active" });
+    }
+
+    // Only links the user switched off themselves can be switched back on.
+    // Admin-disabled (moderated) and legacy/expired links stay off.
+    if (link.deactivatedBy !== "user") {
+      return res.status(403).json({
+        message:
+          "This link can't be reactivated. Contact support if you think this is a mistake.",
+      });
+    }
+
+    if (link.expiresAt && new Date(link.expiresAt) < new Date()) {
+      return res
+        .status(400)
+        .json({ message: "This link has expired. Create a new link instead." });
+    }
+
+    // The destination may have become unsafe while the link was off
+    const safetyCheck = await checkUrlSafety(link.longUrl);
+    if (safetyCheck.malicious) {
+      return res.status(400).json({
+        message:
+          "This URL has been flagged as unsafe and the link cannot be reactivated",
+      });
+    }
+    if (safetyCheck.unavailable) {
+      return res.status(503).json({
+        message:
+          "URL safety check is temporarily unavailable. Please try again later.",
+      });
+    }
+
+    link.isActive = true;
+    link.deactivatedBy = null;
+    await link.save();
+    await redisClient.del(`short:${link.shortCode}`); // next visit repopulates the cache
+
+    res.json({ message: "Link reactivated" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Failed to reactivate link" });
   }
 };
 
@@ -216,8 +267,8 @@ exports.bulkDeleteLinks = async (req, res) => {
 
     // Scope strictly to this user's own links — never trust IDs alone
     var result = await Link.updateMany(
-      { _id: { $in: ids }, userId: req.session.userId },
-      { $set: { isActive: false } },
+      { _id: { $in: ids }, userId: req.session.userId, isActive: true },
+      { $set: { isActive: false, deactivatedBy: "user" } },
     );
 
     // Clear Redis cache for each affected link so deactivation takes effect immediately
