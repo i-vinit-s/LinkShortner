@@ -113,7 +113,7 @@ Long URLs go in, short trackable ones come out — with password protection, exp
 ### Admin Dashboard
 - Gated behind an `isAdmin` flag and a dedicated `requireAdmin` middleware, layered on top of session auth (no self-service way to become an admin — promotion happens directly in the database)
 - **Overview** — live counts of total users, total/active links, total clicks, and pending reports
-- **Users** — searchable, paginated list; ban/reinstate any non-admin account (admins cannot be banned or ban other admins); status badges show Active, Unverified, or Banned, and banned users are logged out immediately
+- **Users** — searchable, paginated list with a status dot (green Active, orange Unverified, red Banned) and a gold PRO tag on subscribers; ban/reinstate any non-admin account (admins cannot be banned or ban other admins). Banned users are logged out immediately
 - **Links** — searchable, paginated list across all users; deactivate/reactivate any link
 - **Reports** — review, action (deactivate the reported link), or dismiss abuse reports
 - **Bio Pages** — searchable, paginated list of every user's bio pages; publish/unpublish or permanently delete any page

@@ -18,6 +18,25 @@ function StatCard(props) {
   );
 }
 
+function isProUser(u) {
+  if (u.plan !== "pro") return false;
+  // plan is downgraded lazily, so an ended cancelled subscription can still say "pro"
+  if (
+    u.cancelAtPeriodEnd &&
+    u.currentPeriodEnd &&
+    new Date(u.currentPeriodEnd) < new Date()
+  ) {
+    return false;
+  }
+  return true;
+}
+
+function userStatus(u) {
+  if (u.isBanned) return { label: "Banned", dot: "bg-danger" };
+  if (!u.verified) return { label: "Unverified", dot: "bg-signal" };
+  return { label: "Active", dot: "bg-led" };
+}
+
 function UsersTab() {
   var [users, setUsers] = useState([]);
   var [search, setSearch] = useState("");
@@ -107,16 +126,52 @@ function UsersTab() {
         </button>
       </form>
 
+      <div className="flex gap-4 text-xs text-text-muted">
+        <span className="flex items-center gap-1.5">
+          <span className="h-2 w-2 rounded-full bg-led" /> Active
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="h-2 w-2 rounded-full bg-signal" /> Unverified
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="h-2 w-2 rounded-full bg-danger" /> Banned
+        </span>
+      </div>
+
       {loading ? (
         <p className="text-text-muted text-sm">Loading...</p>
       ) : (
-        <div className="space-y-2">
+        <div className="space-y-3">
           {users.map(function (u) {
+            var pro = isProUser(u);
             return (
               <div
                 key={u._id}
-                className="bg-surface border border-white/10 rounded-lg p-3 flex items-center justify-between gap-3"
+                className={
+                  "relative bg-surface border rounded-lg p-3 flex items-center justify-between gap-3 " +
+                  (pro
+                    ? "border-[#e0a82e]/60 shadow-[0_0_14px_rgba(224,168,46,0.12)]"
+                    : "border-white/10")
+                }
               >
+                {pro ? (
+                  <span
+                    title={
+                      u.cancelAtPeriodEnd && u.currentPeriodEnd
+                        ? "Pro until " +
+                          new Date(u.currentPeriodEnd).toLocaleDateString()
+                        : "Pro subscriber"
+                    }
+                    className="absolute -top-2 right-3 flex items-center gap-1 rounded px-2 py-px text-[10px] font-bold font-mono tracking-widest text-[#1a1203] shadow"
+                    style={{
+                      background:
+                        "linear-gradient(135deg, #f9e08b 0%, #e0a82e 55%, #b8801a 100%)",
+                    }}
+                  >
+                    <span aria-hidden="true">★</span> PRO
+                  </span>
+                ) : null}
+
                 <div className="min-w-0">
                   <p className="text-white text-sm truncate">
                     {u.name}{" "}
@@ -126,23 +181,17 @@ function UsersTab() {
                   </p>
                   <p className="text-text-muted text-xs truncate">{u.email}</p>
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
+
+                <div className="flex items-center gap-3 shrink-0">
                   <span
+                    role="img"
+                    title={userStatus(u).label}
+                    aria-label={userStatus(u).label}
                     className={
-                      "text-xs px-2 py-0.5 rounded " +
-                      (u.isBanned
-                        ? "bg-danger/10 text-danger"
-                        : u.verified
-                          ? "bg-led/10 text-led"
-                          : "bg-white/5 text-text-muted")
+                      "inline-block h-2.5 w-2.5 rounded-full shrink-0 " +
+                      userStatus(u).dot
                     }
-                  >
-                    {u.isBanned
-                      ? "Banned"
-                      : u.verified
-                        ? "Active"
-                        : "Unverified"}
-                  </span>
+                  />
                   {!u.isAdmin ? (
                     <button
                       disabled={busyId === u._id}
