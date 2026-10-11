@@ -900,16 +900,22 @@ function AdminDashboard() {
           </h1>
         </div>
 
-        <div className="flex gap-2 border-b border-white/10">
+        <div className="flex gap-1 border-b border-white/10 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {tabs.map(function (t) {
             return (
               <button
                 key={t.key}
-                onClick={function () {
+                onClick={function (e) {
                   setTab(t.key);
+                  // keep the chosen tab in view when the row scrolls on small screens
+                  e.currentTarget.scrollIntoView({
+                    behavior: "smooth",
+                    inline: "center",
+                    block: "nearest",
+                  });
                 }}
                 className={
-                  "text-sm px-3 py-2 border-b-2 transition-colors " +
+                  "shrink-0 whitespace-nowrap text-sm px-3 py-2 border-b-2 transition-colors " +
                   (tab === t.key
                     ? "border-signal text-white"
                     : "border-transparent text-text-muted hover:text-white")
