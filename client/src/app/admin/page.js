@@ -151,34 +151,47 @@ function UsersTab() {
                   "relative bg-surface border rounded-lg p-3 flex items-center justify-between gap-3 " +
                   (pro
                     ? "border-[#e0a82e]/60 shadow-[0_0_14px_rgba(224,168,46,0.12)]"
-                    : "border-white/10")
+                    : u.isAdmin
+                      ? "border-[#6366f1]/50 shadow-[0_0_14px_rgba(99,102,241,0.12)]"
+                      : "border-white/10")
                 }
               >
-                {pro ? (
-                  <span
-                    title={
-                      u.cancelAtPeriodEnd && u.currentPeriodEnd
-                        ? "Pro until " +
-                          new Date(u.currentPeriodEnd).toLocaleDateString()
-                        : "Pro subscriber"
-                    }
-                    className="absolute -top-2 right-3 flex items-center gap-1 rounded px-2 py-px text-[10px] font-bold font-mono tracking-widest text-[#1a1203] shadow"
-                    style={{
-                      background:
-                        "linear-gradient(135deg, #f9e08b 0%, #e0a82e 55%, #b8801a 100%)",
-                    }}
-                  >
-                    <span aria-hidden="true">★</span> PRO
-                  </span>
+                {pro || u.isAdmin ? (
+                  <div className="absolute -top-2 right-3 flex items-center gap-1.5">
+                    {u.isAdmin ? (
+                      <span
+                        title="Administrator"
+                        className="flex items-center gap-1 rounded px-2 py-px text-[10px] font-bold font-mono tracking-widest text-white shadow"
+                        style={{
+                          background:
+                            "linear-gradient(135deg, #6366f1 0%, #4f46e5 55%, #3730a3 100%)",
+                        }}
+                      >
+                        <span aria-hidden="true">◆</span> ADMIN
+                      </span>
+                    ) : null}
+                    {pro ? (
+                      <span
+                        title={
+                          u.cancelAtPeriodEnd && u.currentPeriodEnd
+                            ? "Pro until " +
+                              new Date(u.currentPeriodEnd).toLocaleDateString()
+                            : "Pro subscriber"
+                        }
+                        className="flex items-center gap-1 rounded px-2 py-px text-[10px] font-bold font-mono tracking-widest text-[#1a1203] shadow"
+                        style={{
+                          background:
+                            "linear-gradient(135deg, #f9e08b 0%, #e0a82e 55%, #b8801a 100%)",
+                        }}
+                      >
+                        <span aria-hidden="true">★</span> PRO
+                      </span>
+                    ) : null}
+                  </div>
                 ) : null}
 
                 <div className="min-w-0">
-                  <p className="text-white text-sm truncate">
-                    {u.name}{" "}
-                    {u.isAdmin ? (
-                      <span className="text-signal text-xs ml-1">(admin)</span>
-                    ) : null}
-                  </p>
+                  <p className="text-white text-sm truncate">{u.name}</p>
                   <p className="text-text-muted text-xs truncate">{u.email}</p>
                 </div>
 
