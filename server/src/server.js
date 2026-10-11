@@ -3,12 +3,14 @@ const app = require("./app");
 const connectDB = require("./config/db");
 const { startClickWorker } = require("./workers/clickWorker");
 const { startKeepAlive } = require("./utils/keepAlive");
+const { startBanFlagSync } = require("./utils/seedBanFlags");
 
 const PORT = process.env.PORT || 5000;
 
 connectDB().then(() => {
   app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
   startClickWorker();
+  startBanFlagSync();
   if (process.env.NODE_ENV === "production") {
     startKeepAlive();
   }

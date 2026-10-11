@@ -71,10 +71,15 @@ if (process.env.NODE_ENV === "production") {
 
 app.get("/health", (req, res) => {
   const mongoose = require("mongoose");
-  res.json({
-    status: "ok",
-    mongo: mongoose.connection.readyState === 1 ? "connected" : "down",
-    redis: redisClient.isReady ? "connected" : "down",
+  const mongoUp = mongoose.connection.readyState === 1;
+  const redisUp = redisClient.isReady;
+  const healthy = mongoUp && redisUp;
+
+  // 503 when a dependency is down, so uptime monitors alert without keyword matching
+  res.status(healthy ? 200 : 503).json({
+    status: healthy ? "ok" : "degraded",
+    mongo: mongoUp ? "connected" : "down",
+    redis: redisUp ? "connected" : "down",
     timestamp: Date.now(),
   });
 });
