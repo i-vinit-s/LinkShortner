@@ -26,9 +26,14 @@ export default function LinkCard(props) {
   var onReactivate = props.onReactivate;
   var selected = props.selected;
   var onToggleSelect = props.onToggleSelect;
+  var onEditDestination = props.onEditDestination;
 
   var [copied, setCopied] = useState(false);
   var [showQr, setShowQr] = useState(false);
+  var [editing, setEditing] = useState(false);
+  var [draft, setDraft] = useState("");
+  var [saving, setSaving] = useState(false);
+  var [editError, setEditError] = useState("");
 
   var shortUrl = process.env.NEXT_PUBLIC_APP_URL + "/" + link.shortCode;
   var now = new Date();
@@ -56,6 +61,35 @@ export default function LinkCard(props) {
     setTimeout(function () {
       setCopied(false);
     }, 1500);
+  };
+
+  var startEdit = function () {
+    setDraft(link.longUrl);
+    setEditError("");
+    setEditing(true);
+  };
+
+  var cancelEdit = function () {
+    setEditing(false);
+    setEditError("");
+  };
+
+  var handleSave = async function () {
+    var next = draft.trim();
+    if (!next || next === link.longUrl) {
+      cancelEdit();
+      return;
+    }
+    setSaving(true);
+    setEditError("");
+    try {
+      await onEditDestination(link._id, next);
+      setEditing(false);
+    } catch (err) {
+      setEditError(err.message || "Failed to update link");
+    } finally {
+      setSaving(false);
+    }
   };
 
   var copyLabel = "Copy";
@@ -93,9 +127,50 @@ export default function LinkCard(props) {
               /{link.shortCode}
             </a>
           </div>
-          <p className="text-sm text-text-muted truncate max-w-md mt-1">
-            {link.longUrl}
-          </p>
+          {editing ? (
+            <div className="mt-1 w-full max-w-md">
+              <input
+                autoFocus
+                value={draft}
+                onChange={function (e) {
+                  setDraft(e.target.value);
+                }}
+                onKeyDown={function (e) {
+                  if (e.key === "Enter") handleSave();
+                  if (e.key === "Escape") cancelEdit();
+                }}
+                placeholder="https://new-destination.com"
+                className="w-full bg-surface-raised border border-white/10 rounded-md px-2 py-1 text-sm text-white placeholder:text-text-muted focus:outline-none focus:border-signal"
+              />
+              {editError ? (
+                <p className="text-xs text-danger mt-1">{editError}</p>
+              ) : null}
+              <div className="flex gap-2 mt-2">
+                <button
+                  onClick={handleSave}
+                  disabled={saving}
+                  className="text-xs border border-led/40 text-led rounded-md px-2 py-1 hover:bg-led/10 disabled:opacity-50 transition-colors"
+                >
+                  {saving ? "Saving..." : "Save"}
+                </button>
+                <button
+                  onClick={cancelEdit}
+                  disabled={saving}
+                  className="text-xs border border-white/15 text-text-muted rounded-md px-2 py-1 hover:text-white transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+              <p className="text-xs text-text-muted/70 mt-1">
+                The short link and QR code stay the same. Only where they point
+                changes.
+              </p>
+            </div>
+          ) : (
+            <p className="text-sm text-text-muted truncate max-w-md mt-1">
+              {link.longUrl}
+            </p>
+          )}
           {link.tags && link.tags.length > 0 ? (
             <div className="flex flex-wrap gap-1 mt-1">
               {link.tags.map(function (tag) {
@@ -132,6 +207,15 @@ export default function LinkCard(props) {
         >
           QR
         </button>
+        {link.deactivatedBy !== "admin" ? (
+          <button
+            onClick={startEdit}
+            disabled={editing}
+            className="text-sm border border-white/15 rounded-md px-3 py-1.5 text-text-muted hover:text-white hover:border-white/30 disabled:opacity-40 transition-colors"
+          >
+            Edit
+          </button>
+        ) : null}
         <Link
           href={"/dashboard/" + link._id}
           className="text-sm border border-white/15 rounded-md px-3 py-1.5 text-text-muted hover:text-white hover:border-white/30 transition-colors"

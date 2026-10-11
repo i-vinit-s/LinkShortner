@@ -203,6 +203,86 @@ exports.deleteLink = async (req, res) => {
   }
 };
 
+exports.updateLink = async (req, res) => {
+  try {
+    var newUrl =
+      typeof req.body.longUrl === "string" ? req.body.longUrl.trim() : "";
+
+    if (!newUrl || newUrl.length > 2048 || !validUrl.isWebUri(newUrl)) {
+      return res.status(400).json({ message: "A valid URL is required" });
+    }
+    if (!isSafeUrl(newUrl)) {
+      return res
+        .status(400)
+        .json({ message: "Only http/https URLs are allowed" });
+    }
+
+    var link = await Link.findOne({
+      _id: req.params.id,
+      userId: req.session.userId,
+    });
+    if (!link) return res.status(404).json({ message: "Link not found" });
+
+    // Admin-moderated links stay frozen
+    if (link.deactivatedBy === "admin") {
+      return res.status(403).json({
+        message:
+          "This link was disabled by an administrator and can't be edited",
+      });
+    }
+
+    if (newUrl === link.longUrl) {
+      return res
+        .status(400)
+        .json({ message: "That's already the current destination" });
+    }
+
+    // A link must not point at itself (redirect loop)
+    try {
+      var parsed = new URL(newUrl);
+      var ownHost = process.env.CLIENT_URL
+        ? new URL(process.env.CLIENT_URL).hostname
+        : null;
+      var path = parsed.pathname.replace(/^\/|\/$/g, "");
+      if (ownHost && parsed.hostname === ownHost && path === link.shortCode) {
+        return res
+          .status(400)
+          .json({ message: "A link can't point to itself" });
+      }
+    } catch (e) {
+      // URL was already validated above; a bad CLIENT_URL shouldn't block edits
+    }
+
+    var safetyCheck = await checkUrlSafety(newUrl);
+    if (safetyCheck.malicious) {
+      return res.status(400).json({
+        message: "This URL has been flagged as unsafe and cannot be used",
+      });
+    }
+    if (safetyCheck.unavailable) {
+      return res.status(503).json({
+        message:
+          "URL safety check is temporarily unavailable. Please try again later.",
+      });
+    }
+
+    link.destinationHistory.push({ url: link.longUrl });
+    if (link.destinationHistory.length > 10) {
+      link.destinationHistory = link.destinationHistory.slice(-10);
+    }
+    link.longUrl = newUrl;
+    await link.save();
+
+    // The redirect engine caches the destination — drop it so the next visit uses the new one
+    await redisClient.del("short:" + link.shortCode);
+
+    res.json({ message: "Destination updated", longUrl: link.longUrl });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Failed to update link" });
+  }
+};
+
 exports.reactivateLink = async (req, res) => {
   try {
     const link = await Link.findOne({

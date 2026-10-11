@@ -73,6 +73,24 @@ function DashboardContent() {
             : "Failed to deactivate link",
         );
       }
+  };
+  
+    var handleEditDestination = async function (id, newUrl) {
+      try {
+        var res = await api.patch("/links/" + id, { longUrl: newUrl });
+        setLinks(function (prev) {
+          return prev.map(function (l) {
+            return l._id === id ? { ...l, longUrl: res.data.longUrl } : l;
+          });
+        });
+      } catch (err) {
+        // LinkCard shows this message under the input
+        throw new Error(
+          err.response && err.response.data && err.response.data.message
+            ? err.response.data.message
+            : "Failed to update link",
+        );
+      }
     };
 
     var handleReactivate = async function (id) {
@@ -319,6 +337,7 @@ function DashboardContent() {
                             link={link}
                             onDelete={handleDelete}
                             onReactivate={handleReactivate}
+                            onEditDestination={handleEditDestination}
                             selected={selectedIds.indexOf(link._id) !== -1}
                             onToggleSelect={toggleSelect}
                           />
@@ -364,6 +383,7 @@ function DashboardContent() {
                             link={link}
                             onDelete={handleDelete}
                             onReactivate={handleReactivate}
+                            onEditDestination={handleEditDestination}
                             selected={selectedIds.indexOf(link._id) !== -1}
                             onToggleSelect={toggleSelect}
                           />

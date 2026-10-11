@@ -1,6 +1,14 @@
 const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
 
+const destinationChangeSchema = new mongoose.Schema(
+  {
+    url: { type: String, required: true },
+    changedAt: { type: Date, default: Date.now },
+  },
+  { _id: false },
+);
+
 const linkSchema = new mongoose.Schema(
   {
     shortCode: { type: String, required: true, unique: true, index: true },
@@ -23,6 +31,8 @@ const linkSchema = new mongoose.Schema(
       enum: ["user", "admin", null],
       default: null,
     },
+    // Previous destinations (oldest first, capped at 10) — useful for tracing abuse
+    destinationHistory: { type: [destinationChangeSchema], default: [] },
   },
   { timestamps: true },
 );

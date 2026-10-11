@@ -305,7 +305,7 @@ The built-in keep-alive ping only prevents free-tier host spin-down while the pr
 
 1. Sign up at [UptimeRobot](https://uptimerobot.com) (free tier supports 5-minute checks).
 2. Add a new **HTTP(s)** monitor pointing at your deployed API's `/health` endpoint.
-3. Set the expected keyword to `"redis":"connected"` and add a second monitor for `"mongo":"connected"`.
+3. Leave the monitor type as HTTP(s). `/health` returns 503 when `MongoDB` or `Redis` is down, so any dependency failure triggers an alert.
 4. Configure alert contacts (email, Slack, or webhook) to be notified on downtime.
 
 ---
@@ -363,7 +363,8 @@ All routes are prefixed with `/api/v1` unless noted otherwise.
 | GET | `/links/tags` | List all distinct tags the user has used |
 | POST | `/links/bulk-delete` | Deactivate multiple links at once |
 | DELETE | `/links/:id` | Deactivate a single link |
-| POST | /links/:id/reactivate | Reactivate a link the user deactivated (not admin-disabled or expired links; destination is re-checked with Safe Browsing) |
+| POST | `/links/:id/reactivate` | Reactivate a link the user deactivated (not admin-disabled or expired links; destination is re-checked with Safe Browsing) |
+| PATCH | `/links/:id` | Change a link's destination (owner only). The new URL is re-checked with Safe Browsing and the redirect cache is cleared. Not allowed on admin-disabled links |
 
 ### Resolving Short Links
 
@@ -462,7 +463,7 @@ All routes below require an authenticated session **and** `isAdmin: true`.
 **Known limitations:**
 - "Resuming" a cancelled subscription clears the app's own tracking flag rather than reversing the cancellation with Razorpay directly, since not all cancellation schedules can be undone via the API — the underlying subscription was never told to stop billing in the first place (only scheduled to at cycle end), so this is safe, but it's a simplification worth knowing about.
 - The internal keep-alive ping only prevents sleep while the process is already running; it cannot wake a sleeping instance or alert anyone if the process crashes. An external uptime monitor is the more robust solution for production use.
-- Ban flags live in Redis. If Redis is flushed, already-logged-in banned users are not blocked until the flags are restored (login stays blocked via the database).
+- Ban flags live in Redis and are re-created from MongoDB on startup and whenever Redis reconnects.
 
 ---
 
