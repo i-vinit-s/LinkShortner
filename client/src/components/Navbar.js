@@ -70,11 +70,11 @@ export default function Navbar() {
             </span>
           )}
           <Link
-              href="/dashboard/bio"
-              className="text-sm border border-white/15 rounded-md px-3 py-1.5 text-text-muted hover:text-white hover:border-white/30 transition-colors"
-            >
-              Bio Page
-            </Link>
+            href="/dashboard/bio"
+            className="text-sm border border-white/15 rounded-md px-3 py-1.5 text-text-muted hover:text-white hover:border-white/30 transition-colors"
+          >
+            Bio Page
+          </Link>
           {user && user.isAdmin ? (
             <Link
               href="/admin"
@@ -111,6 +111,13 @@ export default function Navbar() {
           <span className="text-sm text-text-muted font-body px-1 py-1">
             {user.name}
           </span>
+          <Link
+            href="/dashboard/bio"
+            onClick={() => setMenuOpen(false)}
+            className="text-sm border border-white/15 rounded-md px-3 py-2 text-text-muted hover:text-white hover:border-white/30 transition-colors text-center"
+          >
+            Bio Page
+          </Link>
           {user.isAdmin ? (
             <Link
               href="/admin"
@@ -122,7 +129,7 @@ export default function Navbar() {
           ) : null}
           <button
             onClick={handleLogout}
-            className="text-sm border border-white/15 rounded-md px-3 py-2 text-text-muted hover:text-white hover:border-white/30 transition-colors"
+            className="text-sm border border-red-500/20 rounded-md px-3 py-2 text-red-400 hover:text-red-300 hover:border-red-500/40 hover:bg-red-500/5 transition-colors"
           >
             Log out
           </button>

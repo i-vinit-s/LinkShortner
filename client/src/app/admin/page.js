@@ -900,7 +900,7 @@ function AdminDashboard() {
           </h1>
         </div>
 
-        <div className="flex gap-1 border-b border-white/10 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="flex gap-1 border-b border-white/10 overflow-x-auto scrollbar-none [&::-webkit-scrollbar]:hidden">
           {tabs.map(function (t) {
             return (
               <button
