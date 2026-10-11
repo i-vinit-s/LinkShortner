@@ -41,6 +41,16 @@ linkSchema.methods.comparePassword = function (candidate) {
   return bcrypt.compare(candidate, this.passwordHash);
 };
 
+// Never send the password hash to any client — expose only whether one is set.
+// (Server code that reads link.passwordHash on a document is unaffected.)
+linkSchema.set("toJSON", {
+  transform: (doc, ret) => {
+    ret.hasPassword = !!ret.passwordHash;
+    delete ret.passwordHash;
+    return ret;
+  },
+});
+
 linkSchema.index({ userId: 1, tags: 1 });
 
 module.exports = mongoose.model("Link", linkSchema);

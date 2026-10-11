@@ -172,7 +172,7 @@ function DashboardContent() {
       });
     } else if (statusFilter === "password") {
       result = result.filter(function (link) {
-        return !!link.passwordHash;
+        return !!link.hasPassword;
       });
     }
 

@@ -459,6 +459,7 @@ All routes below require an authenticated session **and** `isAdmin: true`.
 - Billing mutations (`create-subscription`, `cancel`, `resume`) require an authenticated session; only the webhook endpoint is exempt, and it authenticates via signature instead.
 - Banning a user now immediately invalidates active sessions via a Redis ban flag (`banned:<userId>`) checked by the auth middleware — banned users are rejected on their very next request.
 - Destination URLs are checked against Google Safe Browsing on link creation, QR generation, and bio page saves. In production, the check **fails closed** if the API key is missing or the API is unreachable.
+- Link password hashes never leave the server: API responses expose only a hasPassword flag.
 
 **Known limitations:**
 - "Resuming" a cancelled subscription clears the app's own tracking flag rather than reversing the cancellation with Razorpay directly, since not all cancellation schedules can be undone via the API — the underlying subscription was never told to stop billing in the first place (only scheduled to at cycle end), so this is safe, but it's a simplification worth knowing about.
