@@ -152,3 +152,73 @@ body {
     @apply font-sans;
   }
 }
+
+/* ---- Bio pages: animations and button hover effects ---- */
+@keyframes bio-rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes bio-drift {
+
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+
+  50% {
+    transform: translate(40px, 30px) scale(1.12);
+  }
+}
+
+/* "backwards" (not "both") so the end state doesn't override hover transforms */
+.bio-rise {
+  animation: bio-rise 0.55s ease backwards;
+}
+
+.bio-blob {
+  animation: bio-drift 14s ease-in-out infinite;
+}
+
+.bio-blob-b {
+  animation-duration: 18s;
+  animation-direction: reverse;
+}
+
+.bio-btn {
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease,
+    opacity 0.18s ease;
+}
+
+.bio-hover-fade:hover {
+  opacity: 0.8;
+}
+
+.bio-hover-lift:hover {
+  transform: translateY(-3px);
+}
+
+.bio-hover-glow:hover {
+  box-shadow: 0 0 22px var(--bio-accent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+  .bio-rise,
+  .bio-blob {
+    animation: none;
+  }
+
+  .bio-btn {
+    transition: none;
+  }
+}

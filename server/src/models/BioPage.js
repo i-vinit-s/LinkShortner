@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const { THEME_ENUMS } = require("../utils/bioPresets");
 
 const bioLinkSchema = new mongoose.Schema(
   {
@@ -12,7 +13,7 @@ const bioLinkSchema = new mongoose.Schema(
 
 const bioThemeSchema = new mongoose.Schema(
   {
-    preset: { type: String, default: "signal" }, // 'signal' | 'ocean' | 'sunset' | 'forest' | 'mono' | 'custom'
+    preset: { type: String, default: "signal" }, // a key from PRESET_KEYS (utils/bioPresets.js)
     custom: {
       bg: { type: String, default: "#12141C" },
       surface: { type: String, default: "#1B1F2A" },
@@ -21,9 +22,32 @@ const bioThemeSchema = new mongoose.Schema(
     },
     buttonStyle: {
       type: String,
-      enum: ["rounded", "pill", "square"],
+      enum: THEME_ENUMS.buttonStyle,
       default: "rounded",
     },
+    buttonFill: {
+      type: String,
+      enum: THEME_ENUMS.buttonFill,
+      default: "surface",
+    },
+    buttonHover: {
+      type: String,
+      enum: THEME_ENUMS.buttonHover,
+      default: "fade",
+    },
+    background: {
+      type: String,
+      enum: THEME_ENUMS.background,
+      default: "solid",
+    },
+    font: { type: String, enum: THEME_ENUMS.font, default: "classic" },
+    avatarShape: {
+      type: String,
+      enum: THEME_ENUMS.avatarShape,
+      default: "circle",
+    },
+    avatarRing: { type: Boolean, default: false },
+    animate: { type: Boolean, default: false },
   },
   { _id: false },
 );

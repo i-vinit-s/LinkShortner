@@ -3,20 +3,10 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import api from "@/lib/api";
-import { PLATFORMS, BioIcon } from "@/components/BioIcons";
+import { PLATFORMS } from "@/components/BioIcons";
 import BioThemePicker from "@/components/BioThemePicker";
-import { resolveThemeColors, buttonRadiusClass } from "@/lib/bioPresets";
-
-var DEFAULT_THEME = {
-  preset: "signal",
-  custom: {
-    bg: "#12141C",
-    surface: "#1B1F2A",
-    accent: "#F5A623",
-    text: "#EDEFF4",
-  },
-  buttonStyle: "rounded",
-};
+import BioPageView from "@/components/BioPageView";
+import { DEFAULT_THEME, normalizeTheme } from "@/lib/bioPresets";
 
 export default function BioBuilder(props) {
   var pageId = props.pageId; // null for a new page
@@ -46,7 +36,7 @@ export default function BioBuilder(props) {
           setBio(p.bio || "");
           setAvatarUrl(p.avatarUrl || "");
           setLinks(p.links || []);
-          setTheme(p.theme || DEFAULT_THEME);
+          setTheme(normalizeTheme(p.theme));
         } catch (err) {
           setError("Failed to load page");
         } finally {
@@ -149,9 +139,6 @@ export default function BioBuilder(props) {
   if (loading) {
     return <p className="text-text-muted text-sm">Loading...</p>;
   }
-
-  var colors = resolveThemeColors(theme);
-  var radiusClass = buttonRadiusClass(theme.buttonStyle);
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -320,66 +307,17 @@ export default function BioBuilder(props) {
         <p className="text-xs uppercase tracking-widest text-text-muted font-mono mb-2">
           Preview
         </p>
-        <div
-          className="rounded-xl p-8 text-center space-y-4"
-          style={{ backgroundColor: colors.bg }}
-        >
-          <div
-            className="w-20 h-20 rounded-full mx-auto overflow-hidden flex items-center justify-center"
-            style={{ backgroundColor: colors.surface }}
-          >
-            {avatarUrl ? (
-              <img
-                src={avatarUrl}
-                alt=""
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <span style={{ color: colors.text }} className="text-2xl">
-                ?
-              </span>
-            )}
-          </div>
-          <div>
-            <p
-              className="font-display font-bold"
-              style={{ color: colors.text }}
-            >
-              {displayName || "Your name"}
-            </p>
-            <p
-              className="text-sm mt-1"
-              style={{ color: colors.text, opacity: 0.7 }}
-            >
-              {bio || "Your bio goes here"}
-            </p>
-          </div>
-          <div className="space-y-2 pt-2">
-            {links
-              .filter(function (l) {
-                return l.label;
-              })
-              .map(function (link) {
-                return (
-                  <div
-                    key={link.id}
-                    className={
-                      "flex items-center gap-2 px-4 py-2.5 text-sm " +
-                      radiusClass
-                    }
-                    style={{
-                      backgroundColor: colors.surface,
-                      color: colors.text,
-                      border: "1px solid " + colors.accent + "33",
-                    }}
-                  >
-                    <BioIcon platform={link.platform} />
-                    <span>{link.label}</span>
-                  </div>
-                );
-              })}
-          </div>
-        </div>
+        <BioPageView
+          preview
+          page={{
+            displayName: displayName,
+            bio: bio,
+            avatarUrl: avatarUrl,
+            links: links,
+            theme: theme,
+            showBranding: false,
+          }}
+        />
       </div>
     </div>
   );

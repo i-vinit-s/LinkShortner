@@ -113,6 +113,12 @@ exports.saveBioPage = async function (req, res) {
       return res.status(400).json({ message: "Invalid theme configuration" });
     }
 
+    if (avatarUrl && !/^https?:\/\//i.test(avatarUrl)) {
+      return res
+        .status(400)
+        .json({ message: "Avatar must be an http or https image URL" });
+    }
+
     var slugFilter = { slug: slug };
     if (pageId) slugFilter._id = { $ne: pageId };
     var slugTaken = await BioPage.findOne(slugFilter);
@@ -144,20 +150,18 @@ exports.saveBioPage = async function (req, res) {
     for (var j = 0; j < cleanLinks.length; j++) {
       var safetyCheck = await checkUrlSafety(cleanLinks[j].url);
       if (safetyCheck.malicious) {
-        return res
-          .status(400)
-          .json({
-            message:
-              'Link "' + cleanLinks[j].label + '" points to a URL flagged as unsafe',
-          });
+        return res.status(400).json({
+          message:
+            'Link "' +
+            cleanLinks[j].label +
+            '" points to a URL flagged as unsafe',
+        });
       }
       if (safetyCheck.unavailable) {
-        return res
-          .status(503)
-          .json({
-            message:
-              "URL safety check is temporarily unavailable. Please try again later.",
-          });
+        return res.status(503).json({
+          message:
+            "URL safety check is temporarily unavailable. Please try again later.",
+        });
       }
     }
 
