@@ -6,12 +6,14 @@ const BATCH_SIZE = 100;
 const INTERVAL_MS = 5000; // drain every 5 seconds
 
 async function processBatch() {
+  const rawEvents = [];
   try {
     // Pull up to BATCH_SIZE items off the front of the queue
     const events = [];
     for (let i = 0; i < BATCH_SIZE; i++) {
       const raw = await redisClient.lPop("click:queue");
       if (!raw) break;
+      rawEvents.push(raw);
       events.push(JSON.parse(raw));
     }
 
@@ -39,7 +41,13 @@ async function processBatch() {
       }));
 
     if (docs.length > 0) {
-      await ClickEvent.insertMany(docs, { ordered: false });
+      try {
+        await ClickEvent.insertMany(docs, { ordered: false });
+      } catch (err) {
+        // MongoDB was unreachable: put the events back so the next run retries them
+        await redisClient.lPush("click:queue", rawEvents.reverse());
+        throw err;
+      }
 
       // Update the rough clickCount on each Link too (bulk operation, not per-click)
       const counts = {};

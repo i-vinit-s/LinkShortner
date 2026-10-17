@@ -1,7 +1,6 @@
 const validator = require("validator");
 const Report = require("../models/Report");
 const Link = require("../models/Link");
-const redisClient = require("../config/redis");
 
 exports.submitReport = async (req, res) => {
   try {
@@ -54,43 +53,5 @@ exports.submitReport = async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Failed to submit report" });
-  }
-};
-
-// Admin-only: list pending reports (protect this behind your own admin check later)
-exports.listReports = async (req, res) => {
-  try {
-    var reports = await Report.find().sort({ createdAt: -1 }).limit(100);
-    res.json({ reports: reports });
-  } catch (err) {
-    res.status(500).json({ message: "Failed to fetch reports" });
-  }
-};
-
-// Admin-only: deactivate the reported link and mark the report actioned
-exports.actionReport = async (req, res) => {
-  try {
-    var report = await Report.findById(req.params.id);
-    if (!report) return res.status(404).json({ message: "Report not found" });
-
-    // Try to extract a short code if a full URL was submitted
-    var candidate = report.shortCodeOrUrl;
-    var match = candidate.match(/\/([A-Za-z0-9_-]+)\/?$/);
-    var shortCode = match ? match[1] : candidate;
-
-    var link = await Link.findOne({ shortCode: shortCode });
-    if (link) {
-      link.isActive = false;
-      await link.save();
-      await redisClient.del("short:" + shortCode);
-    }
-
-    report.status = "actioned";
-    await report.save();
-
-    res.json({ message: "Link deactivated and report marked actioned" });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Failed to action report" });
   }
 };

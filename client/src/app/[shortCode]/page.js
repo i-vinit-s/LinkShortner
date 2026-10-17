@@ -14,7 +14,9 @@ export default function ShortLinkPage() {
   useEffect(() => {
     const resolve = async () => {
       try {
-        const res = await api.get("/resolve/" + params.shortCode);
+        const res = await api.get("/resolve/" + params.shortCode, {
+          params: { ref: document.referrer },
+        });
         if (res.data.requiresPassword) {
           setStatus("password");
         } else {
@@ -38,6 +40,7 @@ export default function ShortLinkPage() {
     try {
       const res = await api.post("/resolve/" + params.shortCode + "/verify", {
         password,
+        ref: document.referrer,
       });
       window.location.href = res.data.longUrl;
     } catch (err) {

@@ -4,12 +4,16 @@ const {
   resolveLink,
   verifyLinkPassword,
 } = require("../controllers/redirect.controller");
-const { limitRedirect } = require("../middleware/rateLimiter");
+const {
+  limitRedirect,
+  limitPasswordVerify,
+} = require("../middleware/rateLimiter");
 
 router.get("/api/v1/resolve/:shortCode", limitRedirect, resolveLink);
 router.post(
   "/api/v1/resolve/:shortCode/verify",
   limitRedirect,
+  limitPasswordVerify,
   verifyLinkPassword,
 );
 

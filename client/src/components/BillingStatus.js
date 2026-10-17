@@ -21,6 +21,7 @@ export default function BillingStatus() {
   };
 
   useEffect(function () {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadStatus();
   }, []);
 
@@ -37,7 +38,11 @@ export default function BillingStatus() {
       alert(res.data.message);
       loadStatus();
     } catch (err) {
-      alert("Failed to cancel subscription");
+      alert(
+        err.response && err.response.data && err.response.data.message
+          ? err.response.data.message
+          : "Failed to cancel subscription",
+      );
     } finally {
       setActionLoading(false);
     }
@@ -50,7 +55,11 @@ export default function BillingStatus() {
       alert(res.data.message);
       loadStatus();
     } catch (err) {
-      alert("Failed to resume subscription");
+      alert(
+        err.response && err.response.data && err.response.data.message
+          ? err.response.data.message
+          : "Failed to resume subscription",
+      );
     } finally {
       setActionLoading(false);
     }
@@ -71,7 +80,7 @@ export default function BillingStatus() {
               Pro plan (cancelling)
             </p>
             <p className="text-xs text-text-muted mt-0.5">
-              You're on Pro until {periodEndStr}, then your account moves to
+              You&apos;re on Pro until {periodEndStr}, then your account moves to
               Free.
             </p>
           </>
@@ -88,7 +97,7 @@ export default function BillingStatus() {
           <>
             <p className="text-sm text-danger font-medium">Payment issue</p>
             <p className="text-xs text-text-muted mt-0.5">
-              Your last payment didn't go through — please resubscribe.
+              Your last payment didn&apos;t go through — please resubscribe.
             </p>
           </>
         ) : (

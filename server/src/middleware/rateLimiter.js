@@ -66,6 +66,30 @@ const bioViewLimiter = new RateLimiterRedis({
   duration: 60,
 });
 
+const signupLimiter = new RateLimiterRedis({
+  storeClient: redisClient,
+  useRedisPackage: true,
+  keyPrefix: "rl:signup",
+  points: 5,
+  duration: 3600, // 5 signups per hour per IP (each one sends an email)
+});
+
+const otpVerifyLimiter = new RateLimiterRedis({
+  storeClient: redisClient,
+  useRedisPackage: true,
+  keyPrefix: "rl:otp-verify",
+  points: 5,
+  duration: 600, // 5 code guesses per 10 minutes per email
+});
+
+const passwordVerifyLimiter = new RateLimiterRedis({
+  storeClient: redisClient,
+  useRedisPackage: true,
+  keyPrefix: "rl:link-password",
+  points: 5,
+  duration: 300, // 5 password guesses per 5 minutes per IP and link
+}); 
+
 function makeMiddleware(limiter, keyFn) {
   return async (req, res, next) => {
     try {
@@ -93,9 +117,15 @@ function makeMiddleware(limiter, keyFn) {
   };
 }
 
-// Key by IP for anonymous/redirect/login limits, by userId for authenticated limits
-const getIp = (req) =>
-  req.headers["x-forwarded-for"]?.split(",")[0].trim() || req.ip;
+// req.ip is the real client address (Express "trust proxy" is set in production).
+// Never read X-Forwarded-For directly: the client controls its first value.
+const getIp = (req) => req.ip;
+
+// Lower-cased so "A@x.com" and "a@x.com" share one counter
+const emailKey = (req) =>
+  (req.body && typeof req.body.email === "string"
+    ? req.body.email.toLowerCase().trim()
+    : "") || getIp(req);
 
 module.exports = {
   limitAnonymousLinkCreation: makeMiddleware(anonymousLinkLimiter, getIp),
@@ -105,9 +135,12 @@ module.exports = {
   ),
   limitRedirect: makeMiddleware(redirectLimiter, getIp),
   limitLogin: makeMiddleware(loginLimiter, getIp),
-  limitOtpResend: makeMiddleware(
-    otpLimiter,
-    (req) => req.body.email || getIp(req),
+  limitOtpResend: makeMiddleware(otpLimiter, emailKey),
+  limitSignup: makeMiddleware(signupLimiter, getIp),
+  limitOtpVerify: makeMiddleware(otpVerifyLimiter, emailKey),
+  limitPasswordVerify: makeMiddleware(
+    passwordVerifyLimiter,
+    (req) => getIp(req) + ":" + req.params.shortCode,
   ),
   limitReport: makeMiddleware(reportLimiter, getIp),
   limitQrGenerate: makeMiddleware(qrGenLimiter, getIp),

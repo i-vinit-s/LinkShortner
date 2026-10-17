@@ -85,6 +85,12 @@ exports.verifyLinkPassword = async (req, res) => {
         .status(400)
         .json({ message: "This link is not password protected" });
 
+    if (link.expiresAt && new Date(link.expiresAt) < new Date()) {
+      return res
+        .status(410)
+        .json({ message: "This link has expired", expired: true });
+    }
+
     const match = await link.comparePassword(password);
     if (!match) return res.status(403).json({ message: "Incorrect password" });
 
@@ -99,23 +105,27 @@ exports.verifyLinkPassword = async (req, res) => {
   }
 };
 
+// The Referer header on this API call is always our own frontend page, so the
+// short-link page sends the visitor's real document.referrer as "ref".
+function pickReferrer(req) {
+  const ref = (req.query && req.query.ref) || (req.body && req.body.ref);
+  return typeof ref === "string" && ref ? ref.slice(0, 300) : "direct";
+}
+
 async function trackClick(shortCode, req) {
   await redisClient.incr("clicks:" + shortCode);
 
   const ua = new UAParser(req.headers["user-agent"]);
   const parsed = ua.getResult();
 
-  const ip = (req.headers["x-forwarded-for"] || req.socket.remoteAddress || "")
-    .split(",")[0]
-    .trim()
-    .replace("::ffff:", "");
+  const ip = (req.ip || "").replace("::ffff:", ""); // not X-Forwarded-For: clients can fake it
 
   const geo = geoip.lookup(ip);
 
   const event = {
     shortCode,
     timestamp: Date.now(),
-    referrer: req.headers.referer || "direct",
+    referrer: pickReferrer(req),
     device: parsed.device.type || "desktop",
     browser: parsed.browser.name || "unknown",
     os: parsed.os.name || "unknown",

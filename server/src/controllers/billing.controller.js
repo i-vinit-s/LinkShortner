@@ -11,14 +11,14 @@ exports.createSubscription = async function (req, res) {
 
     await syncUserPlan(user);
 
-    if (
-      user.plan === "pro" &&
-      user.subscriptionStatus === "active" &&
-      !user.cancelAtPeriodEnd
-    ) {
-      return res
-        .status(400)
-        .json({ message: "You already have an active Pro subscription" });
+    // Also blocks while a cancellation is pending: a second subscription would bill
+    // the user again for the period they already paid for.
+    if (user.plan === "pro" && user.subscriptionStatus === "active") {
+      return res.status(400).json({
+        message: user.cancelAtPeriodEnd
+          ? "Your Pro plan is still active until the end of the current period. You can subscribe again after that."
+          : "You already have an active Pro subscription",
+      });
     }
 
     var subscription = await razorpay.subscriptions.create({
@@ -70,9 +70,34 @@ exports.cancelSubscription = async function (req, res) {
       return res.status(400).json({ message: "No active subscription found" });
     }
 
-    // true = schedule cancellation at the end of the current billing cycle.
-    // This was previously passed as `false`, which cancels immediately — a real bug fixed here.
-    await razorpay.subscriptions.cancel(user.razorpaySubscriptionId, true);
+    var id = user.razorpaySubscriptionId;
+    try {
+      // true = cancel at the end of the current billing cycle (Pro stays until then)
+      await razorpay.subscriptions.cancel(id, true);
+    } catch (err) {
+      var reason = err && err.error && err.error.description;
+      console.error(
+        "Razorpay cancel failed:",
+        err && err.statusCode,
+        reason || err,
+      );
+
+      // Razorpay may already be ending this subscription (cancelled earlier, or a
+      // cancellation is already scheduled). Then only our flag is out of sync: fix it.
+      var remote = await razorpay.subscriptions.fetch(id).catch(function () {
+        return null;
+      });
+      var alreadyEnding =
+        remote &&
+        (remote.status === "cancelled" ||
+          remote.status === "completed" ||
+          remote.has_scheduled_changes);
+      if (!alreadyEnding) {
+        return res
+          .status(502)
+          .json({ message: reason || "Failed to cancel subscription" });
+      }
+    }
 
     user.cancelAtPeriodEnd = true;
     await user.save();
@@ -97,9 +122,25 @@ exports.resumeSubscription = async function (req, res) {
         .json({ message: "No pending cancellation to undo" });
     }
 
-    // Razorpay doesn't support "un-cancelling" a scheduled cancellation directly on all plans,
-    // so we resume by simply clearing our own flag — the subscription keeps running as normal
-    // since we scheduled cancellation for cycle-end, not immediate.
+    // Clearing only our own flag would be a lie: Razorpay would still cancel at the
+    // end of the period. Ask Razorpay to drop the scheduled cancellation, and only
+    // clear our flag if it agrees.
+    try {
+      await razorpay.subscriptions.cancelScheduledChanges(
+        user.razorpaySubscriptionId,
+      );
+    } catch (err) {
+      console.error(
+        "Razorpay resume failed:",
+        err && err.statusCode,
+        (err && err.error && err.error.description) || err,
+      );
+      return res.status(409).json({
+        message:
+          "This cancellation can't be undone. Your Pro plan stays active until the end of the current period; you can subscribe again after that.",
+      });
+    }
+
     user.cancelAtPeriodEnd = false;
     await user.save();
 
@@ -107,6 +148,7 @@ exports.resumeSubscription = async function (req, res) {
       message: "Your subscription will continue renewing as normal.",
     });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ message: "Failed to resume subscription" });
   }
 };
@@ -195,6 +237,8 @@ exports.handleWebhook = async function (req, res) {
       });
       if (userPending) {
         userPending.subscriptionStatus = "past_due";
+        // halted = Razorpay gave up retrying the payment; "pending" is still a retry, so keep Pro for that
+        if (event === "subscription.halted") userPending.plan = "free";
         await userPending.save();
       }
     } else if (event === "payment.failed") {
