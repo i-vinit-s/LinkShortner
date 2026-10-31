@@ -3,6 +3,8 @@ const router = express.Router();
 const {
   createLink,
   getMyLinks,
+  importLinksCsv,
+  exportMyLinksCsv,
   getDestinationHistory,
   restoreDestination,
   updateLink,
@@ -15,6 +17,8 @@ const { requireAuth } = require("../middleware/auth");
 const {
   limitAnonymousLinkCreation,
   limitAuthLinkCreation,
+  limitBulkImport,
+  limitLinkExport,
 } = require("../middleware/rateLimiter");
 
 // Branch the rate limiter based on auth status
@@ -26,6 +30,14 @@ const smartLinkLimiter = (req, res, next) => {
 };
 
 router.post("/", smartLinkLimiter, createLink);
+router.post(
+  "/import",
+  requireAuth,
+  limitBulkImport,
+  express.text({ type: "text/csv", limit: "10kb" }),
+  importLinksCsv,
+);
+router.get("/mine/export", requireAuth, limitLinkExport, exportMyLinksCsv);
 router.get("/mine", requireAuth, getMyLinks);
 router.get("/:id/history", requireAuth, getDestinationHistory);
 router.post(

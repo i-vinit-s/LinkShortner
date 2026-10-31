@@ -8,6 +8,7 @@ import QuickQrForm from "@/components/QuickQrForm";
 import LinkCard from "@/components/LinkCard";
 import LinkFilterBar from "@/components/LinkFilterBar";
 import Pagination from "@/components/Pagination";
+import BulkLinkImport from "@/components/BulkLinkImport";
 import api from "@/lib/api";
 import BillingStatus from "@/components/BillingStatus";
 import { ListSkeleton } from "@/components/LoadingSkeleton";
@@ -21,6 +22,8 @@ function DashboardContent() {
   var [pageInfo, setPageInfo] = useState({ total: 0, allTotal: 0, pages: 0, limit: 20 });
   var [selectedIds, setSelectedIds] = useState([]);
   var [bulkLoading, setBulkLoading] = useState(false);
+  var [exporting, setExporting] = useState(false);
+  var [exportFeedback, setExportFeedback] = useState(null);
   var [actionFeedback, setActionFeedback] = useState(null);
 
   var [search, setSearch] = useState("");
@@ -93,6 +96,40 @@ function DashboardContent() {
     setLoading(true);
     setLoadError("");
     setReloadKey(function (key) { return key + 1; });
+  };
+
+  var handleExportCsv = async function () {
+    setExporting(true);
+    setExportFeedback(null);
+    try {
+      var response = await api.get("/links/mine/export", {
+        params: {
+          search: search.trim(),
+          status: statusFilter,
+          sort: sortBy,
+          tag: tagFilter,
+        },
+        responseType: "blob",
+      });
+      var objectUrl = URL.createObjectURL(
+        new Blob([response.data], { type: "text/csv;charset=utf-8" }),
+      );
+      var anchor = document.createElement("a");
+      anchor.href = objectUrl;
+      anchor.download = "shortlink-links.csv";
+      anchor.click();
+      window.setTimeout(function () { URL.revokeObjectURL(objectUrl); }, 1000);
+      setExportFeedback({ type: "success", message: "CSV export started." });
+    } catch (err) {
+      setExportFeedback({
+        type: "error",
+        message: err.response?.status === 413
+          ? "Export is limited to 5,000 links. Narrow your filters and try again."
+          : "Could not export links. Please try again.",
+      });
+    } finally {
+      setExporting(false);
+    }
   };
 
   var handleCreated = function () {
@@ -301,7 +338,27 @@ function DashboardContent() {
           {activeTab === "url" ? (
             <>
               <CreateLinkForm onCreated={handleCreated} />
-
+              <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start">
+                <BulkLinkImport onImported={handleCreated} />
+                <button
+                  type="button"
+                  onClick={handleExportCsv}
+                  disabled={exporting || loading || pageInfo.total === 0}
+                  aria-busy={exporting}
+                  className="ui-button-secondary focus-ring min-h-11 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {exporting ? "Preparing CSV…" : "Export filtered CSV"}
+                </button>
+              </div>
+              {exportFeedback ? (
+                <p
+                  className={`text-sm ${exportFeedback.type === "error" ? "text-danger" : "text-led"}`}
+                  role={exportFeedback.type === "error" ? "alert" : "status"}
+                  aria-live="polite"
+                >
+                  {exportFeedback.message}
+                </p>
+              ) : null}
               {!loadError && pageInfo.allTotal > 0 ? (
                 <LinkFilterBar
                   search={search}

@@ -94,6 +94,9 @@ Dark, fully responsive UI. Images are in [`docs/screenshots`](docs/screenshots).
 - Soft deletes — deactivated links keep their analytics history intact
 - Bulk select + bulk deactivate from the dashboard, with a mobile-friendly sticky action bar
 - Search, status filter (active / expired / password-protected), tag filter, and sort (newest, oldest, most/least clicks)
+- Bulk CSV import with a row preview, URL/alias/tag validation, duplicate handling, and filtered CSV export (up to 5,000 links)
+
+CSV import requires a `url` header and optionally accepts `alias` and `tags`; separate multiple tags with `|` and escape literal `|` or `\\` characters with a backslash. Imports are limited to 25 rows and 9 KB per file. Duplicate destinations for the same account are skipped. CSV exports use the current link filters and sort order; narrow the filters if an export exceeds 5,000 links.
 - Downloadable QR code per link, generated on demand (not stored as an image — regenerated from the link data, keeping the database lean)
 - A standalone QR generator, separate from the link-shortening flow:
   - Anonymous use: encodes the raw destination URL directly (no scan tracking, no database record)

@@ -90,6 +90,22 @@ const passwordVerifyLimiter = new RateLimiterRedis({
   duration: 300, // 5 password guesses per 5 minutes per IP and link
 }); 
 
+const bulkImportLimiter = new RateLimiterRedis({
+  storeClient: redisClient,
+  useRedisPackage: true,
+  keyPrefix: "rl:bulk-import",
+  points: 2,
+  duration: 600,
+});
+
+const linkExportLimiter = new RateLimiterRedis({
+  storeClient: redisClient,
+  useRedisPackage: true,
+  keyPrefix: "rl:link-export",
+  points: 5,
+  duration: 3600,
+});
+
 function makeMiddleware(limiter, keyFn) {
   return async (req, res, next) => {
     try {
@@ -145,4 +161,6 @@ module.exports = {
   limitReport: makeMiddleware(reportLimiter, getIp),
   limitQrGenerate: makeMiddleware(qrGenLimiter, getIp),
   limitBioView: makeMiddleware(bioViewLimiter, getIp),
+  limitBulkImport: makeMiddleware(bulkImportLimiter, (req) => req.session.userId),
+  limitLinkExport: makeMiddleware(linkExportLimiter, (req) => req.session.userId),
 };

@@ -12,8 +12,15 @@ const {
 } = require("../utils/linkListQuery");
 const { appendDestinationHistory } = require("../utils/destinationHistory");
 const { clearShortCodeCache } = require("../utils/shortCodeCache");
+const {
+  escapeCsvCell,
+  parseDelimitedTags,
+  parseLinkImportCsv,
+  serializeDelimitedTags,
+} = require("../utils/linkCsv");
 
 const LINK_LIST_PAGE_SIZE = 20;
+const MAX_LINK_EXPORT_ROWS = 5000;
 
 const RESERVED_ALIASES = [
   "api",
@@ -216,6 +223,202 @@ exports.getMyLinks = async (req, res) => {
     });
   } catch (err) {
     res.status(500).json({ message: "Failed to fetch links" });
+  }
+};
+
+exports.importLinksCsv = async (req, res) => {
+  const results = [];
+  let importRows = [];
+  let currentIndex = -1;
+  const summarize = () => results.reduce((counts, result) => {
+    counts[result.status] = (counts[result.status] || 0) + 1;
+    return counts;
+  }, {});
+
+  try {
+    const parsed = parseLinkImportCsv(req.body);
+    if (parsed.error) return res.status(parsed.status || 400).json({ message: parsed.error });
+    importRows = parsed.rows;
+
+    const urls = importRows.map((row) => row.url).filter(Boolean);
+    const existingLinks = await Link.find({
+      userId: req.session.userId,
+      longUrl: { $in: urls },
+    }).select("longUrl").lean();
+    const existingUrls = new Set(existingLinks.map((link) => link.longUrl));
+    const seenUrls = new Set();
+    const seenAliases = new Set();
+    rowLoop: for (let index = 0; index < importRows.length; index += 1) {
+      currentIndex = index;
+      const row = importRows[index];
+      const fail = (status, message) => results.push({ row: row.rowNumber, status, message });
+
+      if (!row.url) {
+        fail("invalid", "URL is required.");
+        continue;
+      }
+      if (row.url.length > 2048 || !validUrl.isWebUri(row.url) || !isSafeUrl(row.url)) {
+        fail("invalid", "Enter a valid HTTP or HTTPS URL up to 2,048 characters.");
+        continue;
+      }
+      if (existingUrls.has(row.url) || seenUrls.has(row.url)) {
+        fail("duplicate", "This destination is already in your links or this CSV.");
+        continue;
+      }
+
+      const alias = row.alias;
+      if (alias && !/^[a-zA-Z0-9_-]{3,20}$/.test(alias)) {
+        fail("invalid", "Alias must be 3–20 letters, numbers, dashes, or underscores.");
+        continue;
+      }
+      if (alias && RESERVED_ALIASES.includes(alias.toLowerCase())) {
+        fail("invalid", "This alias is reserved.");
+        continue;
+      }
+      if (alias && seenAliases.has(alias.toLowerCase())) {
+        fail("duplicate", "This alias appears more than once in this CSV.");
+        continue;
+      }
+
+      const tags = Array.from(new Set(parseDelimitedTags(row.tags).map((tag) => tag.toLowerCase())));
+      if (tags.length > 5 || tags.some((tag) => tag.length > 20)) {
+        fail("invalid", "Use up to five tags, with no tag longer than 20 characters.");
+        continue;
+      }
+
+      if (alias) {
+        const aliasExists = await Link.findOne({
+          $or: [{ shortCode: alias }, { legacyShortCodes: alias }],
+        }).select("_id").lean();
+        if (aliasExists) {
+          fail("duplicate", "This alias is already in use.");
+          continue;
+        }
+      }
+
+      const safetyCheck = await checkUrlSafety(row.url);
+      if (safetyCheck.unavailable) {
+        fail("blocked", "URL safety check is temporarily unavailable; this row was not imported.");
+        for (const remaining of importRows.slice(index + 1)) {
+          results.push({ row: remaining.rowNumber, status: "blocked", message: "Not checked because URL safety is unavailable." });
+        }
+        break;
+      }
+      if (safetyCheck.malicious) {
+        fail("unsafe", "This destination was flagged as unsafe.");
+        continue;
+      }
+
+      let link;
+      for (let attempt = 0; attempt < 5; attempt += 1) {
+        let shortCode;
+        try {
+          shortCode = alias || await generateUniqueShortCode(Link);
+        } catch (err) {
+          console.error("CSV short-code generation failed:", err.message);
+          fail("failed", "A unique short code could not be generated.");
+          for (const remaining of importRows.slice(index + 1)) {
+            results.push({ row: remaining.rowNumber, status: "blocked", message: "Not processed after a server error." });
+          }
+          break rowLoop;
+        }
+        try {
+          link = await Link.create({
+            shortCode,
+            customAlias: !!alias,
+            longUrl: row.url,
+            userId: req.session.userId,
+            tags,
+          });
+          break;
+        } catch (err) {
+          if (err.code === 11000 && !alias && attempt < 4) continue;
+          if (err.code === 11000 && alias) {
+            fail("duplicate", "This alias was claimed by another link during import.");
+            break;
+          }
+          console.error("CSV link import failed:", err.message);
+          fail("failed", "The link could not be saved.");
+          for (const remaining of importRows.slice(index + 1)) {
+            results.push({ row: remaining.rowNumber, status: "blocked", message: "Not processed after a server error." });
+          }
+          break rowLoop;
+        }
+      }
+
+      if (link) {
+        existingUrls.add(row.url);
+        seenUrls.add(row.url);
+        if (alias) seenAliases.add(alias.toLowerCase());
+        results.push({ row: row.rowNumber, status: "created", shortCode: link.shortCode });
+      } else if (!results.some((result) => result.row === row.rowNumber)) {
+        fail("failed", "A unique short code could not be generated.");
+      }
+    }
+
+    const summary = summarize();
+    res.status(summary.created ? 201 : 200).json({ summary, results });
+  } catch (err) {
+    console.error(err);
+    if (currentIndex >= 0 && importRows[currentIndex]) {
+      const currentRow = importRows[currentIndex];
+      if (!results.some((result) => result.row === currentRow.rowNumber)) {
+        results.push({ row: currentRow.rowNumber, status: "failed", message: "The row could not be processed." });
+      }
+      for (const remaining of importRows.slice(currentIndex + 1)) {
+        results.push({ row: remaining.rowNumber, status: "blocked", message: "Not processed after a server error." });
+      }
+      return res.status(503).json({
+        message: "Import stopped after partial progress.",
+        summary: summarize(),
+        results,
+      });
+    }
+    res.status(500).json({ message: "Failed to import links" });
+  }
+};
+
+exports.exportMyLinksCsv = async (req, res) => {
+  try {
+    const options = parseLinkListQuery({ ...req.query, page: "1", source: "all" });
+    if (options.error) return res.status(400).json({ message: options.error });
+
+    const links = await Link.find(buildLinkListFilter(req.session.userId, options))
+      .sort(getLinkListSort(options.sort))
+      .limit(MAX_LINK_EXPORT_ROWS + 1)
+      .select("shortCode customAlias longUrl tags createdAt expiresAt isActive clickCount")
+      .lean();
+    if (links.length > MAX_LINK_EXPORT_ROWS) {
+      return res.status(413).json({
+        message: "This export exceeds 5,000 links. Narrow your filters and try again.",
+      });
+    }
+
+    const rows = [
+      ["shortCode", "customAlias", "url", "tags", "status", "clicks", "createdAt", "expiresAt"],
+      ...links.map((link) => {
+        const expired = link.expiresAt && new Date(link.expiresAt) < new Date();
+        const status = !link.isActive ? "inactive" : expired ? "expired" : "active";
+        return [
+          link.shortCode,
+          link.customAlias ? "yes" : "no",
+          link.longUrl,
+          serializeDelimitedTags(link.tags),
+          status,
+          link.clickCount,
+          link.createdAt ? new Date(link.createdAt).toISOString() : "",
+          link.expiresAt ? new Date(link.expiresAt).toISOString() : "",
+        ];
+      }),
+    ];
+    const csv = "\uFEFF" + rows.map((row) => row.map(escapeCsvCell).join(",")).join("\r\n");
+    res.set("Content-Type", "text/csv; charset=utf-8");
+    res.set("Content-Disposition", 'attachment; filename="shortlink-links.csv"');
+    res.set("Cache-Control", "no-store");
+    res.send(csv);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Failed to export links" });
   }
 };
 
