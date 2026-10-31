@@ -515,7 +515,7 @@ function DashboardContent() {
 
       {/* Mobile-only sticky bulk-action bar — appears at the thumb-reachable bottom of the screen */}
       {selectedIds.length > 0 ? (
-        <div className="sm:hidden fixed bottom-0 left-0 right-0 bg-surface border-t border-white/10 px-4 py-3 flex items-center justify-between z-40">
+        <div className="sm:hidden fixed bottom-0 left-0 right-0 rounded-t-2xl border border-white/10 bg-surface px-4 py-3 flex items-center justify-between z-40">
           <span className="text-sm text-text-muted">
             {selectedIds.length} selected
           </span>

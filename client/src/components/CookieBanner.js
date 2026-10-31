@@ -35,7 +35,7 @@ export default function CookieBanner() {
   if (!mounted || dismissed) return null;
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 bg-surface border-t border-white/10 px-4 py-3 z-50">
+    <div className="fixed bottom-0 left-0 right-0 rounded-t-2xl border border-white/10 bg-surface px-4 py-3 z-50">
       <div className="max-w-3xl mx-auto flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <p className="text-xs text-text-muted">
           We use a single essential cookie to keep you signed in. No ads, no
