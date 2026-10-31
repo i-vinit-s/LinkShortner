@@ -1,9 +1,8 @@
 const QRCode = require("qrcode");
 const Link = require("../models/Link");
 const redisClient = require("../config/redis");
-const { encode } = require("../utils/base62");
-const { getNextCounter } = require("../utils/counter");
 const { checkUrlSafety } = require("../utils/safeBrowsing");
+const { generateUniqueShortCode } = require("../utils/shortCode");
 
 exports.getQrCode = async (req, res) => {
   try {
@@ -86,13 +85,29 @@ exports.generateQrFromUrl = async (req, res) => {
     }
 
     // Authenticated: create a real short link so this QR gets full click analytics for free
-    var shortCode = encode(await getNextCounter());
-    var link = await Link.create({
-      shortCode: shortCode,
-      longUrl: url,
-      userId: req.session.userId,
-      source: "qr",
-    });
+    var link;
+    var attempts = 0;
+    while (attempts < 5) {
+      var shortCode = await generateUniqueShortCode(Link);
+      try {
+        link = await Link.create({
+          shortCode: shortCode,
+          longUrl: url,
+          userId: req.session.userId,
+          source: "qr",
+        });
+        break;
+      } catch (err) {
+        if (err.code === 11000) {
+          attempts += 1;
+          continue;
+        }
+        throw err;
+      }
+    }
+    if (!link) {
+      return res.status(500).json({ message: "Could not generate a unique short code" });
+    }
 
     var shortUrl = process.env.CLIENT_URL + "/" + link.shortCode;
 
@@ -100,6 +115,7 @@ exports.generateQrFromUrl = async (req, res) => {
       longUrl: link.longUrl,
       hasPassword: false,
       isActive: true,
+      shortCode: link.shortCode,
     });
     await redisClient.set("short:" + shortCode, cacheValue);
 

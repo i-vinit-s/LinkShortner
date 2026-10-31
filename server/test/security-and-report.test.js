@@ -93,8 +93,10 @@ test("report submission requires an existing short code and saves a valid report
   const originalFindOne = Link.findOne;
   const originalCreate = Report.create;
   let savedReport = null;
-  Link.findOne = async ({ shortCode }) =>
-    shortCode === "abc123" ? { _id: "link-1" } : null;
+  Link.findOne = async (query) =>
+    query.$or.some((condition) => condition.shortCode === "abc123")
+      ? { _id: "link-1" }
+      : null;
   Report.create = async (report) => {
     savedReport = report;
     return report;

@@ -7,6 +7,8 @@
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
     "test": "node --test",
+    "db:short-codes:plan": "node scripts/migrate-short-codes.js",
+    "db:short-codes:apply": "node scripts/migrate-short-codes.js --apply",
     "db:indexes:plan": "node scripts/ensure-query-indexes.js",
     "db:indexes:apply": "node scripts/ensure-query-indexes.js --apply"
   },

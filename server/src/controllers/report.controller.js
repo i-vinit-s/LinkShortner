@@ -28,7 +28,12 @@ exports.submitReport = async (req, res) => {
     var match = shortCodeOrUrl.match(/\/([A-Za-z0-9_-]+)\/?$/);
     var candidateCode = match ? match[1] : shortCodeOrUrl;
 
-    var link = await Link.findOne({ shortCode: candidateCode });
+    var link = await Link.findOne({
+      $or: [
+        { shortCode: candidateCode },
+        { legacyShortCodes: candidateCode },
+      ],
+    });
 
     if (!link) {
       return res.status(404).json({

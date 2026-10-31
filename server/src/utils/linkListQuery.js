@@ -55,7 +55,11 @@ function buildLinkListFilter(userId, options, now = new Date()) {
   if (options.search) {
     const search = new RegExp(escapeRegex(options.search), "i");
     clauses.push({
-      $or: [{ longUrl: search }, { shortCode: search }],
+      $or: [
+        { longUrl: search },
+        { shortCode: search },
+        { legacyShortCodes: search },
+      ],
     });
   }
   if (options.status === "active") {

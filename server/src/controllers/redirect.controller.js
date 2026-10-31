@@ -15,7 +15,10 @@ exports.resolveLink = async (req, res) => {
     if (cached) {
       linkData = JSON.parse(cached);
     } else {
-      const link = await Link.findOne({ shortCode, isActive: true });
+      const link = await Link.findOne({
+        isActive: true,
+        $or: [{ shortCode }, { legacyShortCodes: shortCode }],
+      });
       if (!link) return res.status(404).json({ message: "Link not found" });
 
       // Check expiration explicitly — don't rely solely on Redis TTL eviction
@@ -31,6 +34,7 @@ exports.resolveLink = async (req, res) => {
         longUrl: link.longUrl,
         hasPassword: !!link.passwordHash,
         isActive: link.isActive,
+        shortCode: link.shortCode,
       };
 
       if (link.expiresAt) {
@@ -59,7 +63,7 @@ exports.resolveLink = async (req, res) => {
       return res.json({ requiresPassword: true });
     }
 
-    trackClick(shortCode, req).catch(function (err) {
+    trackClick(linkData.shortCode || shortCode, req).catch(function (err) {
       console.error("Click tracking failed:", err);
     });
 
@@ -79,7 +83,10 @@ exports.verifyLinkPassword = async (req, res) => {
     if (!password)
       return res.status(400).json({ message: "Password is required" });
 
-    const link = await Link.findOne({ shortCode, isActive: true });
+    const link = await Link.findOne({
+      isActive: true,
+      $or: [{ shortCode }, { legacyShortCodes: shortCode }],
+    });
     if (!link) return res.status(404).json({ message: "Link not found" });
     if (!link.passwordHash)
       return res
@@ -95,7 +102,7 @@ exports.verifyLinkPassword = async (req, res) => {
     const match = await link.comparePassword(password);
     if (!match) return res.status(403).json({ message: "Incorrect password" });
 
-    trackClick(shortCode, req).catch(function (err) {
+    trackClick(link.shortCode, req).catch(function (err) {
       console.error("Click tracking failed:", err);
     });
 

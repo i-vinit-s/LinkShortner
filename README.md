@@ -85,9 +85,9 @@ Dark, fully responsive UI. Images are in [`docs/screenshots`](docs/screenshots).
 - Role-based access via an `isAdmin` flag on the user model
 
 ### Link Management
-- **Anonymous shortening** from the homepage — no account required. Anonymous links get random, non-sequential short codes and auto-expire after 14 days, encouraging sign-up for permanent links
+- **Anonymous shortening** from the homepage — no account required. Automatically generated codes are random, seven characters minimum, and anonymous links auto-expire after 14 days.
 - **Authenticated shortening** unlocks the full feature set: custom aliases, password protection, custom expiry, and tags
-- Base62 counter-based short code generation for authenticated users (collision-free); cryptographically random codes for anonymous users (harder to enumerate, reads as disposable)
+- Cryptographically random, collision-checked short codes for all automatically generated links; custom aliases remain available to authenticated users.
 - Password-protected links (bcrypt-hashed, verified via a dedicated resolve/verify flow)
 - Link expiration with lazy deactivation on read
 - Tags (up to 5 per link, normalized and deduplicated) for organizing links
@@ -212,7 +212,7 @@ Dark, fully responsive UI. Images are in [`docs/screenshots`](docs/screenshots).
 
 **Why Redis-first redirects?** Every visit to a short link hits the same lookup — this is the hottest path in the whole system. Checking Redis before MongoDB keeps redirects fast even under load, and click analytics are queued rather than written synchronously so a burst of traffic never blocks a redirect.
 
-**Anonymous vs. authenticated link creation** both flow through the same `POST /links` endpoint and the same Redis-first redirect path — the only difference is which fields the controller allows to be set and which short-code generation strategy is used, keeping the hot path identical regardless of who created the link.
+**Anonymous vs. authenticated link creation** both flow through the same `POST /links` endpoint and Redis-first redirect path. Automatically generated codes are random and at least seven characters; authenticated users can also choose a custom alias.
 
 **Why webhooks, not the checkout callback, drive billing state:** a payment can succeed on Razorpay's side even if the user's browser tab closes before the frontend confirms it. Webhooks are Razorpay's servers calling yours directly, so subscription state stays correct regardless of what happens in the browser.
 
@@ -277,6 +277,10 @@ curl http://localhost:5000/health
 ### MongoDB query indexes
 
 Query indexes are declared in the Mongoose schemas. Review the named query-index plan with `cd server && npm run db:indexes:plan`; apply additive indexes to a development database with `npm run db:indexes:apply`. The script never drops indexes. For production, review the index build against deployment load first and set `CONFIRM_INDEX_BUILD=true` only for the approved maintenance run.
+
+### Migrating older generated short codes
+
+New automatic codes are random and at least seven characters long. Preview older generated codes with `cd server && npm run db:short-codes:plan`; apply the migration with `npm run db:short-codes:apply`. The migration retains each previous code as a legacy alias so existing shared URLs continue to resolve. Production runs require `CONFIRM_SHORT_CODE_MIGRATION=true` after reviewing the plan.
 
 ### Frontend Setup
 

@@ -5,6 +5,7 @@ const BioPage = require("../models/BioPage");
 const Report = require("../models/Report");
 const ClickEvent = require("../models/ClickEvent");
 const redisClient = require("../config/redis");
+const { clearShortCodeCache } = require("../utils/shortCodeCache");
 const Transaction = require("../models/Transaction");
 const { getPageBounds } = require("../utils/pagination");
 
@@ -109,6 +110,7 @@ exports.listAllLinks = async function (req, res) {
       filter = {
         $or: [
           { shortCode: { $regex: search, $options: "i" } },
+          { legacyShortCodes: { $regex: search, $options: "i" } },
           { longUrl: { $regex: search, $options: "i" } },
         ],
       };
@@ -144,7 +146,7 @@ exports.adminDeactivateLink = async function (req, res) {
     link.isActive = !link.isActive;
     link.deactivatedBy = link.isActive ? null : "admin";
     await link.save();
-    await redisClient.del("short:" + link.shortCode);
+    await clearShortCodeCache(redisClient, link);
 
     res.json({
       message: link.isActive ? "Link reactivated" : "Link deactivated",
@@ -179,7 +181,7 @@ exports.actionReport = async function (req, res) {
       report.linkId.isActive = false;
       report.linkId.deactivatedBy = "admin";
       await report.linkId.save();
-      await redisClient.del("short:" + report.linkId.shortCode);
+      await clearShortCodeCache(redisClient, report.linkId);
     }
 
     report.status = "actioned";

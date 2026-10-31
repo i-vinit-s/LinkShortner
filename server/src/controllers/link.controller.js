@@ -2,10 +2,8 @@ const validUrl = require("valid-url");
 const bcrypt = require("bcryptjs");
 const Link = require("../models/Link");
 const redisClient = require("../config/redis");
-const { encode } = require("../utils/base62");
-const { getNextCounter } = require("../utils/counter");
 const { checkUrlSafety } = require("../utils/safeBrowsing");
-const { generateRandomCode } = require("../utils/randomCode");
+const { generateUniqueShortCode } = require("../utils/shortCode");
 const { getPageBounds } = require("../utils/pagination");
 const {
   buildLinkListFilter,
@@ -13,6 +11,7 @@ const {
   parseLinkListQuery,
 } = require("../utils/linkListQuery");
 const { appendDestinationHistory } = require("../utils/destinationHistory");
+const { clearShortCodeCache } = require("../utils/shortCodeCache");
 
 const LINK_LIST_PAGE_SIZE = 20;
 
@@ -112,7 +111,9 @@ exports.createLink = async (req, res) => {
         if (RESERVED_ALIASES.includes(alias.toLowerCase())) {
           return res.status(400).json({ message: "This alias is reserved" });
         }
-        var existsAlias = await Link.findOne({ shortCode: alias });
+        var existsAlias = await Link.findOne({
+          $or: [{ shortCode: alias }, { legacyShortCodes: alias }],
+        });
         if (existsAlias) {
           return res.status(409).json({ message: "Alias already taken" });
         }
@@ -135,13 +136,10 @@ exports.createLink = async (req, res) => {
       // Custom alias path — already validated as unique above
       link = await Link.create(linkData);
     } else {
-      // Generate a short code — sequential for authenticated users (predictable, fine since it's their own),
-      // random-looking for anonymous users (harder to enumerate, and reads as more "temporary/throwaway")
+      // Automatic codes are random and consistently long for every account type.
       var attempts = 0;
       while (attempts < 5) {
-        var candidateCode = isAuthenticated
-          ? encode(await getNextCounter())
-          : generateRandomCode(7);
+        var candidateCode = await generateUniqueShortCode(Link);
 
         try {
           linkData.shortCode = candidateCode;
@@ -167,6 +165,7 @@ exports.createLink = async (req, res) => {
       longUrl: link.longUrl,
       hasPassword: !!link.passwordHash,
       isActive: link.isActive,
+      shortCode: link.shortCode,
     });
 
     if (link.expiresAt) {
@@ -260,7 +259,7 @@ exports.deleteLink = async (req, res) => {
     link.isActive = false; // soft delete — keeps analytics history intact
     link.deactivatedBy = "user";
     await link.save();
-    await redisClient.del(`short:${link.shortCode}`);
+    await clearShortCodeCache(redisClient, link);
 
     res.json({ message: "Link deactivated" });
   } catch (err) {
@@ -325,7 +324,7 @@ exports.updateLink = async (req, res) => {
     await link.save();
 
     // The redirect engine caches the destination — drop it so the next visit uses the new one
-    await redisClient.del("short:" + link.shortCode);
+    await clearShortCodeCache(redisClient, link);
 
     res.json({ message: "Destination updated", longUrl: link.longUrl });
   } catch (err) {
@@ -401,7 +400,7 @@ exports.restoreDestination = async (req, res) => {
     appendDestinationHistory(link, req.session.userId);
     link.longUrl = destinationUrl;
     await link.save();
-    await redisClient.del("short:" + link.shortCode);
+    await clearShortCodeCache(redisClient, link);
 
     res.json({ message: "Destination restored", longUrl: link.longUrl });
   } catch (err) {
@@ -455,7 +454,7 @@ exports.reactivateLink = async (req, res) => {
     link.isActive = true;
     link.deactivatedBy = null;
     await link.save();
-    await redisClient.del(`short:${link.shortCode}`); // next visit repopulates the cache
+    await clearShortCodeCache(redisClient, link); // next visit repopulates the cache
 
     res.json({ message: "Link reactivated" });
   } catch (err) {
@@ -482,9 +481,9 @@ exports.bulkDeleteLinks = async (req, res) => {
     var links = await Link.find({
       _id: { $in: ids },
       userId: req.session.userId,
-    }).select("shortCode");
+    }).select("shortCode legacyShortCodes");
     var deletePromises = links.map(function (link) {
-      return redisClient.del("short:" + link.shortCode);
+      return clearShortCodeCache(redisClient, link);
     });
     await Promise.all(deletePromises);
 

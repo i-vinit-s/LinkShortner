@@ -167,10 +167,19 @@ function createClickWorker({
 
       const events = rawEvents.map(normalizeEvent);
       const shortCodes = [...new Set(events.map((event) => event.shortCode))];
-      const links = await Link.find({ shortCode: { $in: shortCodes } }).select(
-        "_id shortCode",
-      );
-      const linkMap = new Map(links.map((link) => [link.shortCode, link._id]));
+      const links = await Link.find({
+        $or: [
+          { shortCode: { $in: shortCodes } },
+          { legacyShortCodes: { $in: shortCodes } },
+        ],
+      }).select("_id shortCode legacyShortCodes");
+      const linkMap = new Map();
+      for (const link of links) {
+        linkMap.set(link.shortCode, link._id);
+        for (const legacyCode of link.legacyShortCodes || []) {
+          linkMap.set(legacyCode, link._id);
+        }
+      }
 
       const docs = events
         .filter((event) => linkMap.has(event.shortCode))

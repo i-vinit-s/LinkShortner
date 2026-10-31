@@ -9,7 +9,10 @@ exports.getLinkAnalytics = async (req, res) => {
     // Accept either a Mongo _id or a shortCode in the same param
     const query = mongoose.Types.ObjectId.isValid(id)
       ? { _id: id, userId: req.session.userId }
-      : { shortCode: id, userId: req.session.userId };
+      : {
+          userId: req.session.userId,
+          $or: [{ shortCode: id }, { legacyShortCodes: id }],
+        };
 
     const link = await Link.findOne(query);
     if (!link) return res.status(404).json({ message: "Link not found" });
@@ -64,7 +67,10 @@ exports.getRawClickEvents = async (req, res) => {
 
     var query = mongoose.Types.ObjectId.isValid(id)
       ? { _id: id, userId: req.session.userId }
-      : { shortCode: id, userId: req.session.userId };
+      : {
+          userId: req.session.userId,
+          $or: [{ shortCode: id }, { legacyShortCodes: id }],
+        };
 
     var link = await Link.findOne(query);
     if (!link) return res.status(404).json({ message: "Link not found" });

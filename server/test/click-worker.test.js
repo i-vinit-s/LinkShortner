@@ -97,10 +97,10 @@ function makeEvent(overrides = {}) {
   };
 }
 
-function makeDependencies(redis, { failBulkWrite = false } = {}) {
+function makeDependencies(redis, { failBulkWrite = false, link: providedLink } = {}) {
   const inserted = [];
   const linkUpdates = [];
-  const link = { shortCode: "audit", _id: "link-id" };
+  const link = providedLink || { shortCode: "audit", _id: "link-id" };
   return {
     redisClient: redis,
     ClickEvent: {
@@ -149,6 +149,21 @@ test("worker acknowledges events only after persistence and link-count updates",
   assert.equal(await redis.lLen("click:queue"), 0);
   assert.equal(await redis.lLen("click:processing"), 0);
   assert.equal((await redis.hGetAll("click:worker:metrics")).processedEvents, 1);
+});
+
+test("worker attaches queued clicks using a preserved legacy short code", async () => {
+  const raw = JSON.stringify(makeEvent({ shortCode: "A" }));
+  const redis = new FakeRedis({ queue: [raw] });
+  const deps = makeDependencies(redis, {
+    link: { shortCode: "r4Nd0m7", legacyShortCodes: ["A"], _id: "link-id" },
+  });
+  const worker = createClickWorker({ ...deps, logger: { log() {}, warn() {}, error() {} } });
+
+  const result = await worker.processBatch();
+
+  assert.equal(result.inserted, 1);
+  assert.equal(deps.inserted[0].shortCode, "A");
+  assert.equal(deps.inserted[0].linkId, "link-id");
 });
 
 test("failed batches are retained with delayed retries and failure metrics", async () => {

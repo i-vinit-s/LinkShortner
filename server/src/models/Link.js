@@ -17,6 +17,7 @@ const destinationChangeSchema = new mongoose.Schema(
 const linkSchema = new mongoose.Schema(
   {
     shortCode: { type: String, required: true, unique: true, index: true },
+    legacyShortCodes: { type: [String], default: [] },
     longUrl: { type: String, required: true },
     customAlias: { type: Boolean, default: false },
     userId: {
@@ -57,6 +58,10 @@ linkSchema.set("toJSON", {
 });
 
 linkSchema.index({ userId: 1, tags: 1 });
+linkSchema.index(
+  { legacyShortCodes: 1 },
+  { name: "query_legacy_short_codes" },
+);
 linkSchema.index(
   { userId: 1, createdAt: -1 },
   { name: "query_user_created_at_desc" },
