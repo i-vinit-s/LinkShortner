@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import QrModal from "./QrModal";
 import Icon from "@/components/Icon";
+import api from "@/lib/api";
 
 function OdometerCount(props) {
   var value = props.value;
@@ -28,6 +29,7 @@ export default function LinkCard(props) {
   var selected = props.selected;
   var onToggleSelect = props.onToggleSelect;
   var onEditDestination = props.onEditDestination;
+  var onDestinationRestored = props.onDestinationRestored;
 
   var [copied, setCopied] = useState(false);
   var [copyError, setCopyError] = useState(false);
@@ -36,6 +38,12 @@ export default function LinkCard(props) {
   var [draft, setDraft] = useState("");
   var [saving, setSaving] = useState(false);
   var [editError, setEditError] = useState("");
+  var [showHistory, setShowHistory] = useState(false);
+  var [historyData, setHistoryData] = useState(null);
+  var [historyLoading, setHistoryLoading] = useState(false);
+  var [historyError, setHistoryError] = useState("");
+  var [historyNotice, setHistoryNotice] = useState(null);
+  var [restoringIndex, setRestoringIndex] = useState(null);
 
   var shortUrl = process.env.NEXT_PUBLIC_APP_URL + "/" + link.shortCode;
   var now = new Date();
@@ -99,6 +107,53 @@ export default function LinkCard(props) {
     }
   };
 
+  var loadDestinationHistory = async function () {
+    setHistoryLoading(true);
+    setHistoryError("");
+    try {
+      var response = await api.get("/links/" + link._id + "/history");
+      setHistoryData(response.data);
+    } catch (err) {
+      setHistoryError(err.response?.data?.message || "Couldn't load destination history.");
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  var toggleHistory = function () {
+    if (showHistory) {
+      setShowHistory(false);
+      return;
+    }
+    setShowHistory(true);
+    setHistoryNotice(null);
+    if (!historyData) loadDestinationHistory();
+  };
+
+  var restoreDestination = async function (entry) {
+    if (link.deactivatedBy === "admin" || restoringIndex !== null) return;
+    if (!window.confirm("Restore this destination? The current destination will be saved in history.")) return;
+
+    setRestoringIndex(entry.index);
+    setHistoryNotice(null);
+    setHistoryError("");
+    try {
+      var response = await api.post(
+        "/links/" + link._id + "/history/" + entry.index + "/restore",
+        { expectedUrl: entry.url, expectedChangedAt: entry.changedAt },
+      );
+      setHistoryNotice({ type: "success", message: "Previous destination restored." });
+      await loadDestinationHistory();
+      if (onDestinationRestored) {
+        onDestinationRestored(link._id, response.data.longUrl);
+      }
+    } catch (err) {
+      setHistoryError(err.response?.data?.message || "Couldn't restore this destination.");
+    } finally {
+      setRestoringIndex(null);
+    }
+  };
+
   var copyLabel = "Copy";
   if (copied) {
     copyLabel = "Copied";
@@ -107,12 +162,13 @@ export default function LinkCard(props) {
   return (
     <div
       className={
-        "border rounded-xl p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 sm:gap-6 transition-colors " +
+        "border rounded-xl p-4 transition-colors " +
         (selected
           ? "border-signal/70 bg-[#272727]"
           : "border-white/10 bg-[#181818]")
       }
     >
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
       <div className="min-w-0 flex items-center gap-3">
         <input
           type="checkbox"
@@ -229,6 +285,15 @@ export default function LinkCard(props) {
             <Icon name="edit" size={16} />Edit
           </button>
         ) : null}
+        <button
+          type="button"
+          onClick={toggleHistory}
+          aria-expanded={showHistory}
+          aria-controls={showHistory ? `destination-history-${link._id}` : undefined}
+          className="focus-ring ui-button-secondary inline-flex items-center gap-2 text-sm"
+        >
+          <Icon name="history" size={16} />{showHistory ? "Hide history" : "History"}
+        </button>
         <Link
           href={"/dashboard/" + link._id}
           className="focus-ring ui-button-secondary inline-flex items-center gap-2 text-sm"
@@ -262,6 +327,61 @@ export default function LinkCard(props) {
           </span>
         ) : null}
       </div>
+      </div>
+
+      {showHistory ? (
+        <section
+          id={`destination-history-${link._id}`}
+          className="mt-4 border-t border-white/10 pt-4"
+          aria-label={`Destination history for ${link.shortCode}`}
+        >
+          <div className="mb-3">
+            <h3 className="text-sm font-semibold text-white">Destination history</h3>
+            {historyData ? (
+              <p className="mt-1 break-all text-xs text-text-muted">
+                Current: <span className="font-mono text-white">{historyData.currentUrl}</span>
+              </p>
+            ) : null}
+          </div>
+          {historyLoading ? (
+            <p className="text-sm text-text-muted" role="status">Loading history…</p>
+          ) : historyError ? (
+            <div className="flex flex-wrap items-center gap-3">
+              <p className="text-sm text-danger" role="alert">{historyError}</p>
+              <button type="button" onClick={loadDestinationHistory} className="ui-button-secondary focus-ring min-h-9 text-sm">Retry</button>
+            </div>
+          ) : historyData?.history.length ? (
+            <ol className="space-y-2">
+              {historyData.history.slice().reverse().map(function (entry) {
+                var isCurrent = entry.url === historyData.currentUrl;
+                return (
+                  <li key={entry.index} className="flex flex-col gap-3 rounded-lg border border-white/10 bg-surface-raised p-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0">
+                      <p className="break-all font-mono text-sm text-white">{entry.url}</p>
+                      <p className="mt-1 text-xs text-text-muted">
+                        {new Date(entry.changedAt).toLocaleString()} · {entry.changedBy || "Change recorded before actor tracking"}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={function () { restoreDestination(entry); }}
+                      disabled={isCurrent || link.deactivatedBy === "admin" || restoringIndex !== null}
+                      className="ui-button-secondary focus-ring min-h-9 shrink-0 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {restoringIndex === entry.index ? "Restoring…" : isCurrent ? "Current" : "Restore"}
+                    </button>
+                  </li>
+                );
+              })}
+            </ol>
+          ) : (
+            <p className="text-sm text-text-muted">No destination changes yet.</p>
+          )}
+          {historyNotice ? (
+            <p className="mt-3 text-sm text-led" role="status" aria-live="polite">{historyNotice.message}</p>
+          ) : null}
+        </section>
+      ) : null}
 
       {copyError ? (
         <p className="basis-full text-xs text-danger" role="alert">

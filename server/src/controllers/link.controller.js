@@ -12,6 +12,7 @@ const {
   getLinkListSort,
   parseLinkListQuery,
 } = require("../utils/linkListQuery");
+const { appendDestinationHistory } = require("../utils/destinationHistory");
 
 const LINK_LIST_PAGE_SIZE = 20;
 
@@ -28,6 +29,19 @@ function isSafeUrl(url) {
   try {
     var parsed = new URL(url);
     return parsed.protocol === "http:" || parsed.protocol === "https:";
+  } catch (err) {
+    return false;
+  }
+}
+
+function isSelfReferencingShortLink(url, shortCode) {
+  try {
+    var parsed = new URL(url);
+    var ownHost = process.env.CLIENT_URL
+      ? new URL(process.env.CLIENT_URL).hostname
+      : null;
+    var path = parsed.pathname.replace(/^\/|\/$/g, "");
+    return !!ownHost && parsed.hostname === ownHost && path === shortCode;
   } catch (err) {
     return false;
   }
@@ -206,6 +220,30 @@ exports.getMyLinks = async (req, res) => {
   }
 };
 
+exports.getDestinationHistory = async (req, res) => {
+  try {
+    const link = await Link.findOne({
+      _id: req.params.id,
+      userId: req.session.userId,
+    }).populate("destinationHistory.changedBy", "name");
+
+    if (!link) return res.status(404).json({ message: "Link not found" });
+
+    res.json({
+      shortCode: link.shortCode,
+      currentUrl: link.longUrl,
+      history: link.destinationHistory.map((entry, index) => ({
+        index,
+        url: entry.url,
+        changedAt: entry.changedAt,
+        changedBy: entry.changedBy ? entry.changedBy.name : null,
+      })),
+    });
+  } catch (err) {
+    res.status(500).json({ message: "Failed to fetch destination history" });
+  }
+};
+
 exports.deleteLink = async (req, res) => {
   try {
     const link = await Link.findOne({
@@ -264,20 +302,9 @@ exports.updateLink = async (req, res) => {
         .json({ message: "That's already the current destination" });
     }
 
-    // A link must not point at itself (redirect loop)
-    try {
-      var parsed = new URL(newUrl);
-      var ownHost = process.env.CLIENT_URL
-        ? new URL(process.env.CLIENT_URL).hostname
-        : null;
-      var path = parsed.pathname.replace(/^\/|\/$/g, "");
-      if (ownHost && parsed.hostname === ownHost && path === link.shortCode) {
-        return res
-          .status(400)
-          .json({ message: "A link can't point to itself" });
-      }
-    } catch (e) {
-      // URL was already validated above; a bad CLIENT_URL shouldn't block edits
+    // A link must not point at itself (redirect loop).
+    if (isSelfReferencingShortLink(newUrl, link.shortCode)) {
+      return res.status(400).json({ message: "A link can't point to itself" });
     }
 
     var safetyCheck = await checkUrlSafety(newUrl);
@@ -293,10 +320,7 @@ exports.updateLink = async (req, res) => {
       });
     }
 
-    link.destinationHistory.push({ url: link.longUrl });
-    if (link.destinationHistory.length > 10) {
-      link.destinationHistory = link.destinationHistory.slice(-10);
-    }
+    appendDestinationHistory(link, req.session.userId);
     link.longUrl = newUrl;
     await link.save();
 
@@ -307,6 +331,82 @@ exports.updateLink = async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Failed to update link" });
+  }
+};
+
+exports.restoreDestination = async (req, res) => {
+  try {
+    const body = req.body || {};
+    const rawHistoryIndex = req.params.historyIndex;
+    const historyIndex = Number(rawHistoryIndex);
+    const expectedChangedAt = new Date(body.expectedChangedAt);
+    if (
+      typeof rawHistoryIndex !== "string" ||
+      !/^\d{1,2}$/.test(rawHistoryIndex) ||
+      !Number.isInteger(historyIndex) ||
+      historyIndex < 0 ||
+      typeof body.expectedUrl !== "string" ||
+      typeof body.expectedChangedAt !== "string" ||
+      Number.isNaN(expectedChangedAt.getTime())
+    ) {
+      return res.status(400).json({ message: "A valid history entry is required" });
+    }
+
+    const link = await Link.findOne({
+      _id: req.params.id,
+      userId: req.session.userId,
+    });
+    if (!link) return res.status(404).json({ message: "Link not found" });
+    if (link.deactivatedBy === "admin") {
+      return res.status(403).json({
+        message: "This link was disabled by an administrator and can't be changed",
+      });
+    }
+
+    const entry = link.destinationHistory[historyIndex];
+    if (
+      !entry ||
+      entry.url !== body.expectedUrl ||
+      new Date(entry.changedAt).getTime() !== expectedChangedAt.getTime()
+    ) {
+      return res.status(409).json({
+        message: "This history entry is no longer available. Refresh the history and try again.",
+      });
+    }
+
+    if (entry.url === link.longUrl) {
+      return res.status(400).json({ message: "This destination is already current" });
+    }
+
+    const destinationUrl = entry.url;
+    if (!validUrl.isWebUri(destinationUrl) || !isSafeUrl(destinationUrl)) {
+      return res.status(400).json({ message: "This saved destination is no longer valid" });
+    }
+    if (isSelfReferencingShortLink(destinationUrl, link.shortCode)) {
+      return res.status(400).json({ message: "A link can't point to itself" });
+    }
+
+    const safetyCheck = await checkUrlSafety(destinationUrl);
+    if (safetyCheck.malicious) {
+      return res.status(400).json({
+        message: "This destination has been flagged as unsafe and can't be restored",
+      });
+    }
+    if (safetyCheck.unavailable) {
+      return res.status(503).json({
+        message: "URL safety check is temporarily unavailable. Please try again later.",
+      });
+    }
+
+    appendDestinationHistory(link, req.session.userId);
+    link.longUrl = destinationUrl;
+    await link.save();
+    await redisClient.del("short:" + link.shortCode);
+
+    res.json({ message: "Destination restored", longUrl: link.longUrl });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Failed to restore destination" });
   }
 };
 

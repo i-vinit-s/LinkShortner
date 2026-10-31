@@ -3,6 +3,8 @@ const router = express.Router();
 const {
   createLink,
   getMyLinks,
+  getDestinationHistory,
+  restoreDestination,
   updateLink,
   deleteLink,
   reactivateLink,
@@ -25,6 +27,13 @@ const smartLinkLimiter = (req, res, next) => {
 
 router.post("/", smartLinkLimiter, createLink);
 router.get("/mine", requireAuth, getMyLinks);
+router.get("/:id/history", requireAuth, getDestinationHistory);
+router.post(
+  "/:id/history/:historyIndex/restore",
+  requireAuth,
+  limitAuthLinkCreation,
+  restoreDestination,
+);
 router.patch("/:id", requireAuth, limitAuthLinkCreation, updateLink);
 router.delete("/:id", requireAuth, deleteLink);
 router.post("/:id/reactivate", requireAuth, reactivateLink);

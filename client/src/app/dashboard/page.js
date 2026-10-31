@@ -162,6 +162,28 @@ function DashboardContent() {
     });
   };
 
+  var handleDestinationRestored = function (id, longUrl) {
+    setLinks(function (previous) {
+      return previous.map(function (link) {
+        return link._id === id ? { ...link, longUrl: longUrl } : link;
+      });
+    });
+    var query = search.trim().toLowerCase();
+    var restoredLink = links.find(function (link) { return link._id === id; });
+    if (
+      query &&
+      restoredLink &&
+      !longUrl.toLowerCase().includes(query) &&
+      !restoredLink.shortCode.toLowerCase().includes(query)
+    ) {
+      setActionFeedback({
+        type: "success",
+        message: "Destination restored. Refreshing the current search results.",
+      });
+      retryLoad();
+    }
+  };
+
   var handleBulkDelete = async function () {
     if (selectedIds.length === 0) return;
     if (!confirm("Deactivate " + selectedIds.length + " selected link(s)?"))
@@ -353,6 +375,7 @@ function DashboardContent() {
                             onDelete={handleDelete}
                             onReactivate={handleReactivate}
                             onEditDestination={handleEditDestination}
+                            onDestinationRestored={handleDestinationRestored}
                             selected={selectedIds.indexOf(link._id) !== -1}
                             onToggleSelect={toggleSelect}
                           />
@@ -408,6 +431,7 @@ function DashboardContent() {
                             onDelete={handleDelete}
                             onReactivate={handleReactivate}
                             onEditDestination={handleEditDestination}
+                            onDestinationRestored={handleDestinationRestored}
                             selected={selectedIds.indexOf(link._id) !== -1}
                             onToggleSelect={toggleSelect}
                           />

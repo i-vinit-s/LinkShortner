@@ -5,6 +5,11 @@ const destinationChangeSchema = new mongoose.Schema(
   {
     url: { type: String, required: true },
     changedAt: { type: Date, default: Date.now },
+    changedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
   },
   { _id: false },
 );
@@ -31,7 +36,7 @@ const linkSchema = new mongoose.Schema(
       enum: ["user", "admin", null],
       default: null,
     },
-    // Previous destinations (oldest first, capped at 10) — useful for tracing abuse
+    // Previous destinations, oldest first and capped at 10.
     destinationHistory: { type: [destinationChangeSchema], default: [] },
   },
   { timestamps: true },
