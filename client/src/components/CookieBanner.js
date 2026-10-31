@@ -10,11 +10,11 @@ export default function CookieBanner() {
   useEffect(function () {
     try {
       var seen = localStorage.getItem("cookie_notice_seen");
+      // This hydration-safe read must happen after mount to avoid server/client markup mismatch.
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setDismissed(!!seen);
     } catch {
       // Show the notice when storage is blocked; the banner still works for this visit.
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setDismissed(false);
     }
     setMounted(true);
