@@ -6,6 +6,8 @@ test("pagination defaults invalid page values to page one", () => {
   assert.deepEqual(getPageBounds(undefined, 45, 20), { page: 1, pages: 3 });
   assert.deepEqual(getPageBounds("not-a-page", 45, 20), { page: 1, pages: 3 });
   assert.deepEqual(getPageBounds("-4", 45, 20), { page: 1, pages: 3 });
+  assert.deepEqual(getPageBounds("2.5", 45, 20), { page: 1, pages: 3 });
+  assert.deepEqual(getPageBounds("2tail", 45, 20), { page: 1, pages: 3 });
 });
 
 test("pagination clamps oversized page requests and handles empty collections", () => {

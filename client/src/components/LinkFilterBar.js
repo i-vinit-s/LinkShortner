@@ -19,6 +19,8 @@ export default function LinkFilterBar(props) {
       <label htmlFor="link-search" className="text-sm font-medium text-white">Find a link</label>
       <input
         id="link-search"
+        type="search"
+        maxLength={100}
         value={search}
         onChange={function (e) {
           setSearch(e.target.value);

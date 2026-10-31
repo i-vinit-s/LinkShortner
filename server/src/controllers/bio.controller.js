@@ -3,6 +3,9 @@ const User = require("../models/User");
 const { isValidTheme } = require("../utils/bioPresets");
 const { syncUserPlan } = require("../utils/planSync");
 const { checkUrlSafety } = require("../utils/safeBrowsing");
+const { getPageBounds } = require("../utils/pagination");
+
+const BIO_LIST_PAGE_SIZE = 20;
 
 var RESERVED_SLUGS = [
   "admin",
@@ -25,10 +28,25 @@ function isValidSlug(slug) {
 
 exports.listMyBioPages = async function (req, res) {
   try {
-    var pages = await BioPage.find({ userId: req.session.userId }).sort({
-      createdAt: -1,
+    if (req.query.page !== undefined && typeof req.query.page !== "string") {
+      return res.status(400).json({ message: "Page must be a single value." });
+    }
+
+    var filter = { userId: req.session.userId };
+    var total = await BioPage.countDocuments(filter);
+    var bounds = getPageBounds(req.query.page, total, BIO_LIST_PAGE_SIZE);
+    var pages = await BioPage.find(filter)
+      .sort({ createdAt: -1, _id: -1 })
+      .skip((bounds.page - 1) * BIO_LIST_PAGE_SIZE)
+      .limit(BIO_LIST_PAGE_SIZE);
+
+    res.json({
+      pages: pages,
+      total: total,
+      page: bounds.page,
+      pages_count: bounds.pages,
+      limit: BIO_LIST_PAGE_SIZE,
     });
-    res.json({ pages: pages });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Failed to fetch pages" });

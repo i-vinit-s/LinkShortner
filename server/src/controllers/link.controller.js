@@ -6,6 +6,14 @@ const { encode } = require("../utils/base62");
 const { getNextCounter } = require("../utils/counter");
 const { checkUrlSafety } = require("../utils/safeBrowsing");
 const { generateRandomCode } = require("../utils/randomCode");
+const { getPageBounds } = require("../utils/pagination");
+const {
+  buildLinkListFilter,
+  getLinkListSort,
+  parseLinkListQuery,
+} = require("../utils/linkListQuery");
+
+const LINK_LIST_PAGE_SIZE = 20;
 
 const RESERVED_ALIASES = [
   "api",
@@ -170,10 +178,29 @@ exports.createLink = async (req, res) => {
 
 exports.getMyLinks = async (req, res) => {
   try {
-    const links = await Link.find({ userId: req.session.userId }).sort({
-      createdAt: -1,
+    const options = parseLinkListQuery(req.query);
+    if (options.error) return res.status(400).json({ message: options.error });
+
+    const filter = buildLinkListFilter(req.session.userId, options);
+    const allFilter = { userId: req.session.userId };
+    const [total, allTotal] = await Promise.all([
+      Link.countDocuments(filter),
+      Link.countDocuments(allFilter),
+    ]);
+    const bounds = getPageBounds(options.page, total, LINK_LIST_PAGE_SIZE);
+    const links = await Link.find(filter)
+      .sort(getLinkListSort(options.sort))
+      .skip((bounds.page - 1) * LINK_LIST_PAGE_SIZE)
+      .limit(LINK_LIST_PAGE_SIZE);
+
+    res.json({
+      links,
+      total,
+      allTotal,
+      page: bounds.page,
+      pages: bounds.pages,
+      limit: LINK_LIST_PAGE_SIZE,
     });
-    res.json({ links });
   } catch (err) {
     res.status(500).json({ message: "Failed to fetch links" });
   }

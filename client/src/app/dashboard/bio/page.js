@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import Navbar from "@/components/Navbar";
+import Pagination from "@/components/Pagination";
 import api from "@/lib/api";
 import { ListSkeleton } from "@/components/LoadingSkeleton";
 
@@ -12,6 +13,8 @@ function BioPagesList() {
   var [loading, setLoading] = useState(true);
   var [loadError, setLoadError] = useState("");
   var [reloadKey, setReloadKey] = useState(0);
+  var [page, setPage] = useState(1);
+  var [pageInfo, setPageInfo] = useState({ total: 0, pages: 0, limit: 20 });
   var [deletingId, setDeletingId] = useState(null);
   var [deleteFeedback, setDeleteFeedback] = useState(null);
 
@@ -19,8 +22,16 @@ function BioPagesList() {
     var cancelled = false;
     var loadPages = async function () {
       try {
-        var res = await api.get("/bio/mine");
-        if (!cancelled) setPages(res.data.pages);
+        var res = await api.get("/bio/mine", { params: { page: page } });
+        if (!cancelled) {
+          setPages(res.data.pages);
+          setPageInfo({
+            total: res.data.total,
+            pages: res.data.pages_count,
+            limit: res.data.limit,
+          });
+          if (res.data.page !== page) setPage(res.data.page);
+        }
       } catch (err) {
         console.error(err);
         if (!cancelled) setLoadError("We couldn't load your bio pages. Check your connection and try again.");
@@ -32,7 +43,7 @@ function BioPagesList() {
     return function () {
       cancelled = true;
     };
-  }, [reloadKey]);
+  }, [page, reloadKey]);
 
   var handleDelete = async function (id) {
     if (!confirm("Delete this page? This cannot be undone.")) return;
@@ -40,11 +51,7 @@ function BioPagesList() {
     setDeletingId(id);
     try {
       await api.delete("/bio/" + id);
-      setPages(function (prev) {
-        return prev.filter(function (p) {
-          return p._id !== id;
-        });
-      });
+      setReloadKey(function (key) { return key + 1; });
       setDeleteFeedback({ type: "success", message: "Bio page deleted." });
     } catch (err) {
       setDeleteFeedback({
@@ -68,7 +75,7 @@ function BioPagesList() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-display font-bold text-white">
-          Your bio pages
+          Your bio pages <span className="ml-2 font-mono text-base font-normal text-text-muted">{pageInfo.total}</span>
         </h1>
         <Link
           href="/dashboard/bio/new"
@@ -88,7 +95,7 @@ function BioPagesList() {
         </p>
       ) : null}
 
-      {pages.length === 0 ? (
+      {pageInfo.total === 0 ? (
         <div className="border border-dashed border-white/15 rounded-lg p-8 text-center">
           <p className="text-text-muted text-sm">
             No bio pages yet. Create your first one.
@@ -152,6 +159,14 @@ function BioPagesList() {
           })}
         </div>
       )}
+      <Pagination
+        page={page}
+        pages={pageInfo.pages}
+        total={pageInfo.total}
+        limit={pageInfo.limit}
+        onPageChange={setPage}
+        label="Bio pages"
+      />
     </div>
   );
 }

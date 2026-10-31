@@ -7,6 +7,7 @@ import CreateLinkForm from "@/components/CreateLinkForm";
 import QuickQrForm from "@/components/QuickQrForm";
 import LinkCard from "@/components/LinkCard";
 import LinkFilterBar from "@/components/LinkFilterBar";
+import Pagination from "@/components/Pagination";
 import api from "@/lib/api";
 import BillingStatus from "@/components/BillingStatus";
 import { ListSkeleton } from "@/components/LoadingSkeleton";
@@ -16,11 +17,14 @@ function DashboardContent() {
   var [loading, setLoading] = useState(true);
   var [loadError, setLoadError] = useState("");
   var [reloadKey, setReloadKey] = useState(0);
+  var [page, setPage] = useState(1);
+  var [pageInfo, setPageInfo] = useState({ total: 0, allTotal: 0, pages: 0, limit: 20 });
   var [selectedIds, setSelectedIds] = useState([]);
   var [bulkLoading, setBulkLoading] = useState(false);
   var [actionFeedback, setActionFeedback] = useState(null);
 
   var [search, setSearch] = useState("");
+  var [debouncedSearch, setDebouncedSearch] = useState("");
   var [statusFilter, setStatusFilter] = useState("all");
   var [sortBy, setSortBy] = useState("newest");
 
@@ -30,16 +34,38 @@ function DashboardContent() {
   var [activeTab, setActiveTab] = useState("url"); // "url" | "qr"
 
   useEffect(function () {
+    var timer = setTimeout(function () {
+      setDebouncedSearch(search.trim());
+    }, 250);
+    return function () { clearTimeout(timer); };
+  }, [search]);
+
+  useEffect(function () {
     var cancelled = false;
     var loadData = async function () {
+      setLoading(true);
+      setLoadError("");
       try {
-        var results = await Promise.all([
-          api.get("/links/mine"),
-          api.get("/links/tags"),
-        ]);
+        var params = {
+          page: page,
+          source: activeTab === "qr" ? "qr" : "all",
+        };
+        if (activeTab === "url") {
+          params.search = debouncedSearch;
+          params.status = statusFilter;
+          params.sort = sortBy;
+          params.tag = tagFilter;
+        }
+        var result = await api.get("/links/mine", { params: params });
         if (cancelled) return;
-        setLinks(results[0].data.links);
-        setAvailableTags(results[1].data.tags);
+        setLinks(result.data.links);
+        setPageInfo({
+          total: result.data.total,
+          allTotal: result.data.allTotal,
+          pages: result.data.pages,
+          limit: result.data.limit,
+        });
+        if (result.data.page !== page) setPage(result.data.page);
       } catch (err) {
         console.error(err);
         if (!cancelled) setLoadError("We couldn't load your links. Check your connection and try again.");
@@ -51,6 +77,16 @@ function DashboardContent() {
     return function () {
       cancelled = true;
     };
+  }, [activeTab, debouncedSearch, page, reloadKey, sortBy, statusFilter, tagFilter]);
+
+  useEffect(function () {
+    var cancelled = false;
+    api.get("/links/tags").then(function (result) {
+      if (!cancelled) setAvailableTags(result.data.tags);
+    }).catch(function (err) {
+      console.error("Failed to load link tags", err);
+    });
+    return function () { cancelled = true; };
   }, [reloadKey]);
 
   var retryLoad = function () {
@@ -59,10 +95,10 @@ function DashboardContent() {
     setReloadKey(function (key) { return key + 1; });
   };
 
-  var handleCreated = function (newLink) {
-    setLinks(function (prev) {
-      return [newLink].concat(prev);
-    });
+  var handleCreated = function () {
+    setSelectedIds([]);
+    setPage(1);
+    retryLoad();
   };
 
     var handleDelete = async function (id) {
@@ -71,19 +107,12 @@ function DashboardContent() {
       setActionFeedback(null);
       try {
         await api.delete("/links/" + id);
-        // Keep the link in the list (greyed out) so it can be activated again
-        setLinks(function (prev) {
-          return prev.map(function (l) {
-            return l._id === id
-              ? { ...l, isActive: false, deactivatedBy: "user" }
-              : l;
-          });
-        });
         setSelectedIds(function (prev) {
           return prev.filter(function (sid) {
             return sid !== id;
           });
         });
+        retryLoad();
         setActionFeedback({ type: "success", message: "Link deactivated. You can reactivate it at any time." });
       } catch (err) {
         console.error(err);
@@ -96,12 +125,8 @@ function DashboardContent() {
   
     var handleEditDestination = async function (id, newUrl) {
       try {
-        var res = await api.patch("/links/" + id, { longUrl: newUrl });
-        setLinks(function (prev) {
-          return prev.map(function (l) {
-            return l._id === id ? { ...l, longUrl: res.data.longUrl } : l;
-          });
-        });
+        await api.patch("/links/" + id, { longUrl: newUrl });
+        retryLoad();
       } catch (err) {
         // LinkCard shows this message under the input
         throw new Error(
@@ -116,13 +141,7 @@ function DashboardContent() {
       setActionFeedback(null);
       try {
         await api.post("/links/" + id + "/reactivate");
-        setLinks(function (prev) {
-          return prev.map(function (l) {
-            return l._id === id
-              ? { ...l, isActive: true, deactivatedBy: null }
-              : l;
-          });
-        });
+        retryLoad();
         setActionFeedback({ type: "success", message: "Link reactivated." });
       } catch (err) {
         setActionFeedback({
@@ -152,14 +171,8 @@ function DashboardContent() {
     setBulkLoading(true);
     try {
       await api.post("/links/bulk-delete", { ids: selectedIds });
-      setLinks(function (prev) {
-        return prev.map(function (l) {
-          return selectedIds.indexOf(l._id) !== -1 && l.isActive
-            ? { ...l, isActive: false, deactivatedBy: "user" }
-            : l;
-        });
-      });
       setSelectedIds([]);
+      retryLoad();
       setActionFeedback({ type: "success", message: "Selected links deactivated." });
     } catch (err) {
       console.error(err);
@@ -172,76 +185,29 @@ function DashboardContent() {
     }
   };
 
-  var getFilteredLinks = function () {
-    var result = links.slice();
-
-    if (search.trim() !== "") {
-      var query = search.trim().toLowerCase();
-      result = result.filter(function (link) {
-        return (
-          link.longUrl.toLowerCase().indexOf(query) !== -1 ||
-          link.shortCode.toLowerCase().indexOf(query) !== -1
-        );
-      });
-    }
-
-    if (statusFilter === "active") {
-      result = result.filter(function (link) {
-        var expired = link.expiresAt && new Date(link.expiresAt) < new Date();
-        return link.isActive && !expired;
-      });
-    } else if (statusFilter === "expired") {
-      result = result.filter(function (link) {
-        var expired = link.expiresAt && new Date(link.expiresAt) < new Date();
-        return !link.isActive || expired;
-      });
-    } else if (statusFilter === "password") {
-      result = result.filter(function (link) {
-        return !!link.hasPassword;
-      });
-    }
-
-    if (tagFilter !== "all") {
-      result = result.filter(function (link) {
-        return link.tags && link.tags.indexOf(tagFilter) !== -1;
-      });
-    }
-
-    if (sortBy === "newest") {
-      result.sort(function (a, b) {
-        return new Date(b.createdAt) - new Date(a.createdAt);
-      });
-    } else if (sortBy === "oldest") {
-      result.sort(function (a, b) {
-        return new Date(a.createdAt) - new Date(b.createdAt);
-      });
-    } else if (sortBy === "most-clicks") {
-      result.sort(function (a, b) {
-        return b.clickCount - a.clickCount;
-      });
-    } else if (sortBy === "least-clicks") {
-      result.sort(function (a, b) {
-        return a.clickCount - b.clickCount;
-      });
-    }
-
-    return result;
-  };
-
-  var filteredLinks = getFilteredLinks();
+  var filteredLinks = links;
   var allSelected =
-    selectedIds.length === filteredLinks.length && filteredLinks.length > 0;
+    filteredLinks.length > 0 && filteredLinks.every(function (link) {
+      return selectedIds.indexOf(link._id) !== -1;
+    });
 
   var toggleSelectAllFiltered = function () {
     if (allSelected) {
-      setSelectedIds([]);
+      var visibleIds = filteredLinks.map(function (link) { return link._id; });
+      setSelectedIds(function (previous) {
+        return previous.filter(function (id) { return visibleIds.indexOf(id) === -1; });
+      });
     } else {
-      setSelectedIds(
-        filteredLinks.map(function (l) {
-          return l._id;
-        }),
-      );
+      setSelectedIds(function (previous) {
+        return Array.from(new Set(previous.concat(filteredLinks.map(function (link) { return link._id; }))));
+      });
     }
+  };
+
+  var updateFilter = function (setter, value) {
+    setter(value);
+    setPage(1);
+    setSelectedIds([]);
   };
 
   return (
@@ -254,7 +220,7 @@ function DashboardContent() {
             <h1 className="font-display text-3xl font-semibold tracking-tight text-white sm:text-4xl">Links</h1>
             <p className="mt-2 max-w-lg text-sm leading-6 text-text-muted">Create, organize, and understand the links you share.</p>
           </div>
-          <div className="text-left sm:text-right"><p className="font-mono text-2xl text-white">{links.length}</p><p className="text-sm text-text-muted">total links</p></div>
+          <div className="text-left sm:text-right"><p className="font-mono text-2xl text-white">{pageInfo.allTotal}</p><p className="text-sm text-text-muted">total links</p></div>
         </div>
 
         <div className="space-y-4">
@@ -280,6 +246,8 @@ function DashboardContent() {
             <button
               onClick={function () {
                 setActiveTab("url");
+                setPage(1);
+                setSelectedIds([]);
               }}
               className={
                 "focus-ring rounded-t-md px-3 py-3 text-sm transition-colors " +
@@ -294,6 +262,8 @@ function DashboardContent() {
             <button
               onClick={function () {
                 setActiveTab("qr");
+                setPage(1);
+                setSelectedIds([]);
               }}
               className={
                 "focus-ring rounded-t-md px-3 py-3 text-sm transition-colors " +
@@ -310,6 +280,20 @@ function DashboardContent() {
             <>
               <CreateLinkForm onCreated={handleCreated} />
 
+              {!loadError && pageInfo.allTotal > 0 ? (
+                <LinkFilterBar
+                  search={search}
+                  setSearch={function (value) { updateFilter(setSearch, value); }}
+                  statusFilter={statusFilter}
+                  setStatusFilter={function (value) { updateFilter(setStatusFilter, value); }}
+                  sortBy={sortBy}
+                  setSortBy={function (value) { updateFilter(setSortBy, value); }}
+                  availableTags={availableTags}
+                  tagFilter={tagFilter}
+                  setTagFilter={function (value) { updateFilter(setTagFilter, value); }}
+                />
+              ) : null}
+
               {loading ? (
                 <ListSkeleton label="Loading links" rows={3} />
               ) : loadError ? (
@@ -317,7 +301,7 @@ function DashboardContent() {
                   <p className="text-sm text-text-muted" role="alert">{loadError}</p>
                   <button onClick={retryLoad} className="ui-button-secondary focus-ring w-fit text-sm">Retry</button>
                 </div>
-              ) : links.length === 0 ? (
+              ) : links.length === 0 && pageInfo.allTotal === 0 ? (
                 <div className="border border-dashed border-white/15 rounded-lg p-8 text-center">
                   <p className="text-text-muted text-sm">
                     No links yet. Paste a URL above to patch your first one in.
@@ -325,19 +309,7 @@ function DashboardContent() {
                 </div>
               ) : (
                 <>
-                  <LinkFilterBar
-                    search={search}
-                    setSearch={setSearch}
-                    statusFilter={statusFilter}
-                    setStatusFilter={setStatusFilter}
-                    sortBy={sortBy}
-                    setSortBy={setSortBy}
-                    availableTags={availableTags}
-                    tagFilter={tagFilter}
-                    setTagFilter={setTagFilter}
-                  />
-
-                  <div className="flex items-center justify-between gap-3">
+                  {filteredLinks.length > 0 ? <div className="flex items-center justify-between gap-3">
                     <label className="flex items-center gap-2 text-sm text-text-muted cursor-pointer">
                       <input
                         type="checkbox"
@@ -348,7 +320,7 @@ function DashboardContent() {
                       <span>
                         {selectedIds.length > 0
                           ? selectedIds.length + " selected"
-                          : "Select all (" + filteredLinks.length + ")"}
+                          : "Select this page (" + filteredLinks.length + ")"}
                       </span>
                     </label>
 
@@ -363,7 +335,7 @@ function DashboardContent() {
                           : "Deactivate selected"}
                       </button>
                     ) : null}
-                  </div>
+                  </div> : null}
 
                   <div className="space-y-3">
                     {filteredLinks.length === 0 ? (
@@ -388,6 +360,14 @@ function DashboardContent() {
                       })
                     )}
                   </div>
+                  <Pagination
+                    page={page}
+                    pages={pageInfo.pages}
+                    total={pageInfo.total}
+                    limit={pageInfo.limit}
+                    onPageChange={setPage}
+                    label="Links"
+                  />
                 </>
               )}
             </>
@@ -395,6 +375,7 @@ function DashboardContent() {
             <div className="space-y-6">
               <QuickQrForm
                 onSaved={function () {
+                  setPage(1);
                   retryLoad();
                 }}
               />
@@ -404,21 +385,18 @@ function DashboardContent() {
                   My QR Codes
                 </h2>
                 {(function () {
-                  var qrLinks = links.filter(function (l) {
-                    return l.source === "qr";
-                  });
-                  if (loading) {
-                    return <ListSkeleton label="Loading your QR codes" rows={2} />;
-                  }
-                  if (loadError) {
-                    return <div className="flex flex-col gap-3 rounded-xl border border-danger/25 bg-danger/5 p-5 sm:flex-row sm:items-center sm:justify-between"><p className="text-sm text-text-muted" role="alert">{loadError}</p><button onClick={retryLoad} className="ui-button-secondary focus-ring w-fit text-sm">Retry</button></div>;
-                  }
-                  if (qrLinks.length === 0) {
+                  var qrLinks = links;
+                  if (loading) return <ListSkeleton label="Loading your QR codes" rows={2} />;
+                  if (loadError) return <div className="flex flex-col gap-3 rounded-xl border border-danger/25 bg-danger/5 p-5 sm:flex-row sm:items-center sm:justify-between"><p className="text-sm text-text-muted" role="alert">{loadError}</p><button onClick={retryLoad} className="ui-button-secondary focus-ring w-fit text-sm">Retry</button></div>;
+                  if (qrLinks.length === 0 && pageInfo.allTotal === 0) {
                     return (
                       <p className="text-text-muted text-sm">
                         No QR codes generated yet.
                       </p>
                     );
+                  }
+                  if (qrLinks.length === 0) {
+                    return <p className="text-text-muted text-sm">No QR codes generated yet.</p>;
                   }
                   return (
                     <div className="space-y-3">
@@ -438,6 +416,16 @@ function DashboardContent() {
                     </div>
                   );
                 })()}
+                {!loading && !loadError ? (
+                  <Pagination
+                    page={page}
+                    pages={pageInfo.pages}
+                    total={pageInfo.total}
+                    limit={pageInfo.limit}
+                    onPageChange={setPage}
+                    label="QR codes"
+                  />
+                ) : null}
               </div>
             </div>
           )}
