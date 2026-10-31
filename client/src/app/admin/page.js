@@ -953,12 +953,17 @@ function AdminDashboard() {
   var [statsLoading, setStatsLoading] = useState(true);
   var [statsError, setStatsError] = useState(false);
 
+  var fetchStats = function () {
+    return api.get("/admin/stats").then(function (res) {
+      return res.data;
+    });
+  };
+
   var loadStats = async function () {
     setStatsLoading(true);
     setStatsError(false);
     try {
-      var res = await api.get("/admin/stats");
-      setStats(res.data);
+      setStats(await fetchStats());
     } catch (err) {
       console.error(err);
       setStatsError(true);
@@ -968,7 +973,21 @@ function AdminDashboard() {
   };
 
   useEffect(function () {
-    loadStats();
+    var cancelled = false;
+    fetchStats()
+      .then(function (data) {
+        if (!cancelled) setStats(data);
+      })
+      .catch(function (err) {
+        console.error(err);
+        if (!cancelled) setStatsError(true);
+      })
+      .finally(function () {
+        if (!cancelled) setStatsLoading(false);
+      });
+    return function () {
+      cancelled = true;
+    };
   }, []);
 
   var tabs = [

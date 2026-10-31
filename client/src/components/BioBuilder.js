@@ -8,6 +8,7 @@ import BioThemePicker from "@/components/BioThemePicker";
 import BioPageView from "@/components/BioPageView";
 import { DEFAULT_THEME, normalizeTheme } from "@/lib/bioPresets";
 import { SkeletonBlock } from "@/components/LoadingSkeleton";
+import { GripVertical } from "lucide-react";
 
 export default function BioBuilder(props) {
   var pageId = props.pageId; // null for a new page
@@ -19,6 +20,8 @@ export default function BioBuilder(props) {
   var [bio, setBio] = useState("");
   var [avatarUrl, setAvatarUrl] = useState("");
   var [links, setLinks] = useState([]);
+  var [draggedLinkId, setDraggedLinkId] = useState(null);
+  var [reorderMessage, setReorderMessage] = useState("");
   var [theme, setTheme] = useState(DEFAULT_THEME);
   var [loading, setLoading] = useState(!!pageId);
   var [saving, setSaving] = useState(false);
@@ -106,6 +109,34 @@ export default function BioBuilder(props) {
     newLinks[index] = newLinks[target];
     newLinks[target] = temp;
     setLinks(newLinks);
+  };
+
+  var reorderLink = function (sourceId, targetId) {
+    if (!sourceId || sourceId === targetId) return;
+    var sourceIndex = links.findIndex(function (link) {
+      return link.id === sourceId;
+    });
+    var targetIndex = links.findIndex(function (link) {
+      return link.id === targetId;
+    });
+    if (sourceIndex < 0 || targetIndex < 0) return;
+    var moved = links[sourceIndex];
+    setLinks(function (current) {
+      var currentSourceIndex = current.findIndex(function (link) {
+        return link.id === sourceId;
+      });
+      var currentTargetIndex = current.findIndex(function (link) {
+        return link.id === targetId;
+      });
+      if (currentSourceIndex < 0 || currentTargetIndex < 0) return current;
+      var next = current.slice();
+      next.splice(currentSourceIndex, 1);
+      next.splice(currentTargetIndex, 0, moved);
+      return next;
+    });
+    setReorderMessage(
+      "Moved " + (moved.label || "link") + " to position " + (targetIndex + 1) + ".",
+    );
   };
 
   var handleSave = async function () {
@@ -238,9 +269,35 @@ export default function BioBuilder(props) {
             return (
               <div
                 key={link.id}
-                className="bg-surface-raised border border-white/10 rounded-lg p-3 space-y-3"
+                onDragOver={function (event) {
+                  if (draggedLinkId) event.preventDefault();
+                }}
+                onDrop={function (event) {
+                  event.preventDefault();
+                  reorderLink(draggedLinkId, link.id);
+                  setDraggedLinkId(null);
+                }}
+                className={"bg-surface-raised border rounded-lg p-3 space-y-3 " +
+                  (draggedLinkId === link.id ? "border-signal/60 opacity-60" : "border-white/10")}
               >
                 <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    draggable
+                    onDragStart={function (event) {
+                      event.dataTransfer.effectAllowed = "move";
+                      event.dataTransfer.setData("text/plain", link.id);
+                      setDraggedLinkId(link.id);
+                    }}
+                    onDragEnd={function () {
+                      setDraggedLinkId(null);
+                    }}
+                    className="focus-ring min-h-10 min-w-10 flex items-center justify-center rounded-md text-text-muted hover:text-white cursor-grab active:cursor-grabbing"
+                    aria-label={"Drag to reorder " + (link.label || "link " + (index + 1))}
+                    title="Drag to reorder"
+                  >
+                    <GripVertical size={18} aria-hidden="true" />
+                  </button>
                   <select
                     value={link.platform}
                     onChange={function (e) {
@@ -261,6 +318,7 @@ export default function BioBuilder(props) {
                     onClick={function () {
                       moveLink(index, -1);
                     }}
+                    disabled={index === 0}
                     className="focus-ring rounded px-2 text-sm text-text-muted hover:text-white"
                   >
                     Up
@@ -269,6 +327,7 @@ export default function BioBuilder(props) {
                     onClick={function () {
                       moveLink(index, 1);
                     }}
+                    disabled={index === links.length - 1}
                     className="focus-ring rounded px-2 text-sm text-text-muted hover:text-white"
                   >
                     Down
@@ -306,6 +365,8 @@ export default function BioBuilder(props) {
               </div>
             );
           })}
+
+          <p className="sr-only" aria-live="polite">{reorderMessage}</p>
 
           {links.length === 0 ? (
             <p className="text-text-muted text-xs text-center py-2">
