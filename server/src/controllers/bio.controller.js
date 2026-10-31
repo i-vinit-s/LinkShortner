@@ -4,6 +4,7 @@ const { isValidTheme } = require("../utils/bioPresets");
 const { syncUserPlan } = require("../utils/planSync");
 const { checkUrlSafety } = require("../utils/safeBrowsing");
 const { getPageBounds } = require("../utils/pagination");
+const { normalizeBioLinkUrl, isValidBioLinkDestination } = require("../utils/bioLinks");
 
 const BIO_LIST_PAGE_SIZE = 20;
 
@@ -163,14 +164,8 @@ exports.saveBioPage = async function (req, res) {
     for (var i = 0; i < rawLinks.length && i < 15; i++) {
       var l = rawLinks[i];
       if (!l || !l.label || !l.url) continue;
-      var urlStr = String(l.url).trim();
-      try {
-        var parsed = new URL(urlStr);
-        if (parsed.protocol !== "http:" && parsed.protocol !== "https:")
-          continue;
-      } catch (err) {
-        continue;
-      }
+      var urlStr = normalizeBioLinkUrl(l.platform || "website", l.url);
+      if (!urlStr) continue;
       cleanLinks.push({
         id: l.id || "link_" + Date.now() + "_" + i,
         platform: l.platform || "website",
@@ -182,6 +177,9 @@ exports.saveBioPage = async function (req, res) {
 
     // Check all bio link URLs against Safe Browsing
     for (var j = 0; j < cleanLinks.length; j++) {
+      if (cleanLinks[j].platform === "email" || cleanLinks[j].platform === "phone") {
+        continue;
+      }
       var safetyCheck = await checkUrlSafety(cleanLinks[j].url);
       if (safetyCheck.malicious) {
         return res.status(400).json({
@@ -300,13 +298,7 @@ exports.trackPublicBioLinkClick = async function (req, res) {
     });
     if (!link) return res.status(404).json({ message: "Link not found" });
 
-    var destination;
-    try {
-      destination = new URL(link.url);
-    } catch (err) {
-      return res.status(404).json({ message: "Link not found" });
-    }
-    if (destination.protocol !== "http:" && destination.protocol !== "https:") {
+    if (!isValidBioLinkDestination(link.platform, link.url)) {
       return res.status(404).json({ message: "Link not found" });
     }
 
@@ -317,7 +309,7 @@ exports.trackPublicBioLinkClick = async function (req, res) {
     if (!result.matchedCount) {
       return res.status(404).json({ message: "Link not found" });
     }
-    return res.redirect(302, destination.href);
+    return res.redirect(302, link.url);
   } catch (err) {
     console.error(err);
     return res.status(500).json({ message: "Failed to open link" });

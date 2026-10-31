@@ -153,6 +153,7 @@ export default function BioBuilder(props) {
         links: links,
         theme: theme,
       });
+      setLinks(res.data.page.links || []);
       setSuccess("Saved!");
       if (!pageId) {
         router.push("/dashboard/bio/" + res.data.page._id);
@@ -355,11 +356,20 @@ export default function BioBuilder(props) {
                   </p>
                 ) : null}
                 <label className="block text-xs text-text-muted">Destination<input
-                  value={link.url}
+                  type={link.platform === "email" ? "email" : "text"}
+                  value={link.platform === "email"
+                    ? link.url.replace(/^mailto:/i, "")
+                    : link.platform === "phone"
+                      ? link.url.replace(/^tel:/i, "")
+                      : link.url}
                   onChange={function (e) {
                     updateLink(link.id, "url", e.target.value);
                   }}
-                  placeholder="https://example.com"
+                  placeholder={link.platform === "email"
+                    ? "you@example.com"
+                    : link.platform === "phone"
+                      ? "+1 555 123 4567"
+                      : "https://example.com"}
                   className="ui-input focus-ring mt-1"
                 /></label>
               </div>

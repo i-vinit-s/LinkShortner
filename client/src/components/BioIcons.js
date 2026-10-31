@@ -1,5 +1,9 @@
+import { Mail, Phone } from "lucide-react";
+
 export var PLATFORMS = [
   { key: "website", label: "Website" },
+  { key: "email", label: "Email" },
+  { key: "phone", label: "Phone" },
   { key: "discord", label: "Discord" },
   { key: "instagram", label: "Instagram" },
   { key: "github", label: "GitHub" },
@@ -11,6 +15,8 @@ export var PLATFORMS = [
 export function BioIcon(props) {
   var platform = props.platform;
   var size = props.size || 18;
+  if (platform === "email") return <Mail size={size} aria-hidden="true" />;
+  if (platform === "phone") return <Phone size={size} aria-hidden="true" />;
   var common = {
     width: size,
     height: size,

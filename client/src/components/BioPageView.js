@@ -168,8 +168,8 @@ export default function BioPageView(props) {
                   encodeURIComponent(link.id) +
                   "/click"
                 }
-                target="_blank"
-                rel="noopener noreferrer"
+                target={link.platform === "email" || link.platform === "phone" ? "_self" : "_blank"}
+                rel={link.platform === "email" || link.platform === "phone" ? undefined : "noopener noreferrer"}
                 className={cls}
                 style={style}
               >

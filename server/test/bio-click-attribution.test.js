@@ -97,3 +97,27 @@ test("bio link click returns 404 for an unknown or unpublished page", async (t) 
 
   assert.equal(res.statusCode, 404);
 });
+
+test("bio email actions increment clicks and redirect to the validated mailto destination", async (t) => {
+  const originalFindOne = BioPage.findOne;
+  const originalUpdateOne = BioPage.updateOne;
+  t.after(() => {
+    BioPage.findOne = originalFindOne;
+    BioPage.updateOne = originalUpdateOne;
+  });
+
+  BioPage.findOne = async () => ({
+    _id: "page-1",
+    links: [{ id: "email-link", platform: "email", url: "mailto:person@example.com" }],
+  });
+  BioPage.updateOne = async () => ({ matchedCount: 1 });
+
+  const res = response();
+  await trackPublicBioLinkClick(
+    { params: { slug: "my-page", linkId: "email-link" } },
+    res,
+  );
+
+  assert.equal(res.statusCode, 302);
+  assert.equal(res.location, "mailto:person@example.com");
+});
