@@ -9,6 +9,7 @@ router.get("/mine/:id", requireAuth, bio.getBioPageById);
 router.get("/check-slug", requireAuth, bio.checkSlugAvailable);
 router.post("/", requireAuth, bio.saveBioPage);
 router.delete("/:id", requireAuth, bio.deleteBioPage);
+router.get("/public/:slug/links/:linkId/click", limitBioView, bio.trackPublicBioLinkClick);
 router.get("/public/:slug", limitBioView, bio.getPublicBioPage);
 
 module.exports = router;

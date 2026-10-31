@@ -160,7 +160,14 @@ export default function BioPageView(props) {
             return (
               <a
                 key={link.id}
-                href={link.url}
+                href={
+                  process.env.NEXT_PUBLIC_API_URL +
+                  "/bio/public/" +
+                  encodeURIComponent(page.slug) +
+                  "/links/" +
+                  encodeURIComponent(link.id) +
+                  "/click"
+                }
                 target="_blank"
                 rel="noopener noreferrer"
                 className={cls}

@@ -144,6 +144,21 @@ exports.saveBioPage = async function (req, res) {
       return res.status(409).json({ message: "This slug is already taken" });
     }
 
+    var existingPage = null;
+    if (pageId) {
+      existingPage = await BioPage.findOne({
+        _id: pageId,
+        userId: req.session.userId,
+      });
+      if (!existingPage) return res.status(404).json({ message: "Page not found" });
+    }
+    var clickCounts = new Map();
+    if (existingPage && existingPage.links) {
+      existingPage.links.forEach(function (link) {
+        clickCounts.set(link.id, link.clicks || 0);
+      });
+    }
+
     var cleanLinks = [];
     for (var i = 0; i < rawLinks.length && i < 15; i++) {
       var l = rawLinks[i];
@@ -161,6 +176,7 @@ exports.saveBioPage = async function (req, res) {
         platform: l.platform || "website",
         label: String(l.label).trim().slice(0, 40),
         url: urlStr,
+        clicks: clickCounts.get(l.id) || 0,
       });
     }
 
@@ -248,15 +264,62 @@ exports.getPublicBioPage = async function (req, res) {
     );
 
     res.json({
+      slug: page.slug,
       displayName: page.displayName,
       bio: page.bio,
       avatarUrl: page.avatarUrl,
-      links: page.links,
+      links: page.links.map(function (link) {
+        return {
+          id: link.id,
+          platform: link.platform,
+          label: link.label,
+          url: link.url,
+        };
+      }),
       theme: page.theme,
       showBranding: !page.userId || page.userId.plan !== "pro",
     });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Failed to load page" });
+  }
+};
+
+exports.trackPublicBioLinkClick = async function (req, res) {
+  try {
+    var slug = (req.params.slug || "").trim().toLowerCase();
+    var page = await BioPage.findOne({
+      slug: slug,
+      isPublished: true,
+      "links.id": req.params.linkId,
+    });
+    if (!page) return res.status(404).json({ message: "Link not found" });
+
+    var link = page.links.find(function (item) {
+      return item.id === req.params.linkId;
+    });
+    if (!link) return res.status(404).json({ message: "Link not found" });
+
+    var destination;
+    try {
+      destination = new URL(link.url);
+    } catch (err) {
+      return res.status(404).json({ message: "Link not found" });
+    }
+    if (destination.protocol !== "http:" && destination.protocol !== "https:") {
+      return res.status(404).json({ message: "Link not found" });
+    }
+
+    var result = await BioPage.updateOne(
+      { _id: page._id, isPublished: true, "links.id": req.params.linkId },
+      { $inc: { "links.$.clicks": 1 } },
+    );
+    if (!result.matchedCount) {
+      return res.status(404).json({ message: "Link not found" });
+    }
+    return res.redirect(302, destination.href);
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ message: "Failed to open link" });
   }
 };

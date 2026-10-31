@@ -7,6 +7,7 @@ const bioLinkSchema = new mongoose.Schema(
     platform: { type: String, default: "website" },
     label: { type: String, required: true, trim: true },
     url: { type: String, required: true, trim: true },
+    clicks: { type: Number, default: 0, min: 0 },
   },
   { _id: false },
 );

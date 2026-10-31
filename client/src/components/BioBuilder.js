@@ -290,6 +290,11 @@ export default function BioBuilder(props) {
                   placeholder="What should this button say?"
                   className="ui-input focus-ring mt-1"
                 /></label>
+                {pageId && typeof link.clicks === "number" ? (
+                  <p className="text-xs text-text-muted" aria-label={link.clicks + " clicks"}>
+                    {link.clicks.toLocaleString()} {link.clicks === 1 ? "click" : "clicks"}
+                  </p>
+                ) : null}
                 <label className="block text-xs text-text-muted">Destination<input
                   value={link.url}
                   onChange={function (e) {
