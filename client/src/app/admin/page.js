@@ -4,14 +4,15 @@ import { useState, useEffect } from "react";
 import RequireAdmin from "@/components/RequireAdmin";
 import Navbar from "@/components/Navbar";
 import api from "@/lib/api";
+import { ListSkeleton, SkeletonBlock } from "@/components/LoadingSkeleton";
 
 function StatCard(props) {
   return (
-    <div className="bg-surface border border-white/10 rounded-lg p-4">
-      <p className="text-xs uppercase tracking-wide text-text-muted font-mono">
+    <div className="bg-surface border border-white/10 rounded-xl p-4">
+      <p className="text-sm text-text-muted">
         {props.label}
       </p>
-      <p className="text-2xl font-display font-bold text-white mt-1">
+      <p className="text-3xl font-display font-semibold text-white mt-2">
         {props.value}
       </p>
     </div>
@@ -37,16 +38,56 @@ function userStatus(u) {
   return { label: "Active", dot: "bg-led" };
 }
 
+function AdminLoadError({ onRetry }) {
+  return (
+    <div className="flex flex-col gap-3 rounded-lg border border-danger/25 bg-danger/5 p-4 sm:flex-row sm:items-center sm:justify-between">
+      <p className="text-sm text-danger" role="alert">We couldn’t load this section.</p>
+      <button type="button" onClick={onRetry} className="ui-button-secondary focus-ring w-fit text-sm">
+        Try again
+      </button>
+    </div>
+  );
+}
+
+function AdminFeedback({ feedback }) {
+  if (!feedback) return null;
+  return (
+    <p
+      className={`rounded-lg border px-4 py-3 text-sm ${feedback.type === "error" ? "border-danger/25 bg-danger/5 text-danger" : "border-led/25 bg-led/5 text-led"}`}
+      role={feedback.type === "error" ? "alert" : "status"}
+      aria-live={feedback.type === "error" ? "assertive" : "polite"}
+    >
+      {feedback.message}
+    </p>
+  );
+}
+
+function AdminStatsSkeleton({ count = 4 }) {
+  return (
+    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3" role="status" aria-label="Loading overview" aria-busy="true">
+      {Array.from({ length: count }, (_, index) => (
+        <div key={index} className="space-y-3 rounded-lg border border-white/10 bg-surface p-4">
+          <SkeletonBlock className="h-3 w-24" />
+          <SkeletonBlock className="h-7 w-16" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function UsersTab() {
   var [users, setUsers] = useState([]);
   var [search, setSearch] = useState("");
   var [page, setPage] = useState(1);
   var [pages, setPages] = useState(1);
   var [loading, setLoading] = useState(true);
+  var [loadError, setLoadError] = useState(false);
   var [busyId, setBusyId] = useState(null);
+  var [actionFeedback, setActionFeedback] = useState(null);
 
   var loadUsers = async function () {
     setLoading(true);
+    setLoadError(false);
     try {
       var res = await api.get("/admin/users", {
         params: { search: search, page: page },
@@ -55,6 +96,7 @@ function UsersTab() {
       setPages(res.data.pages);
     } catch (err) {
       console.error(err);
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -88,6 +130,7 @@ function UsersTab() {
     }
 
     setBusyId(user._id);
+    setActionFeedback(null);
     try {
       var res = await api.post("/admin/users/" + user._id + "/toggle-ban");
       // Update just this row from the server's answer instead of refetching the whole list
@@ -96,12 +139,12 @@ function UsersTab() {
           return u._id === user._id ? { ...u, isBanned: res.data.isBanned } : u;
         });
       });
+      setActionFeedback({ type: "success", message: res.data.isBanned ? "User banned." : "User reinstated." });
     } catch (err) {
-      alert(
-        err.response && err.response.data && err.response.data.message
-          ? err.response.data.message
-          : "Failed to update user",
-      );
+      setActionFeedback({
+        type: "error",
+        message: err.response?.data?.message || "We couldn’t update this user. Please try again.",
+      });
     } finally {
       setBusyId(null);
     }
@@ -138,8 +181,12 @@ function UsersTab() {
         </span>
       </div>
 
+      <AdminFeedback feedback={actionFeedback} />
+
       {loading ? (
-        <p className="text-text-muted text-sm">Loading...</p>
+        <ListSkeleton label="Loading users" rows={3} />
+      ) : loadError ? (
+        <AdminLoadError onRetry={loadUsers} />
       ) : (
         <div className="space-y-3">
           {users.map(function (u) {
@@ -150,9 +197,9 @@ function UsersTab() {
                 className={
                   "relative bg-surface border rounded-lg p-3 flex items-center justify-between gap-3 " +
                   (pro
-                    ? "border-[#e0a82e]/60 shadow-[0_0_14px_rgba(224,168,46,0.12)]"
+                    ? "border-signal/40"
                     : u.isAdmin
-                      ? "border-[#6366f1]/50 shadow-[0_0_14px_rgba(99,102,241,0.12)]"
+                      ? "border-wire/30"
                       : "border-white/10")
                 }
               >
@@ -161,11 +208,7 @@ function UsersTab() {
                     {u.isAdmin ? (
                       <span
                         title="Administrator"
-                        className="flex items-center gap-1 rounded px-2 py-px text-[10px] font-bold font-mono tracking-widest text-white shadow"
-                        style={{
-                          background:
-                            "linear-gradient(135deg, #6366f1 0%, #4f46e5 55%, #3730a3 100%)",
-                        }}
+                        className="rounded bg-wire/15 px-2 py-1 text-xs font-semibold text-wire"
                       >
                         <span aria-hidden="true">◆</span> ADMIN
                       </span>
@@ -178,11 +221,7 @@ function UsersTab() {
                               new Date(u.currentPeriodEnd).toLocaleDateString()
                             : "Pro subscriber"
                         }
-                        className="flex items-center gap-1 rounded px-2 py-px text-[10px] font-bold font-mono tracking-widest text-[#1a1203] shadow"
-                        style={{
-                          background:
-                            "linear-gradient(135deg, #f9e08b 0%, #e0a82e 55%, #b8801a 100%)",
-                        }}
+                        className="rounded bg-signal/15 px-2 py-1 text-xs font-semibold text-signal"
                       >
                         <span aria-hidden="true">★</span> PRO
                       </span>
@@ -271,9 +310,12 @@ function LinksTab() {
   var [page, setPage] = useState(1);
   var [pages, setPages] = useState(1);
   var [loading, setLoading] = useState(true);
+  var [loadError, setLoadError] = useState(false);
+  var [actionFeedback, setActionFeedback] = useState(null);
 
   var loadLinks = async function () {
     setLoading(true);
+    setLoadError(false);
     try {
       var res = await api.get("/admin/links", {
         params: { search: search, page: page },
@@ -282,6 +324,7 @@ function LinksTab() {
       setPages(res.data.pages);
     } catch (err) {
       console.error(err);
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -303,11 +346,16 @@ function LinksTab() {
   };
 
   var handleToggle = async function (id) {
+    setActionFeedback(null);
     try {
       await api.post("/admin/links/" + id + "/toggle-active");
+      setActionFeedback({ type: "success", message: "Link status updated." });
       loadLinks();
     } catch (err) {
-      alert("Failed to update link");
+      setActionFeedback({
+        type: "error",
+        message: err.response?.data?.message || "We couldn’t update this link. Please try again.",
+      });
     }
   };
 
@@ -330,8 +378,12 @@ function LinksTab() {
         </button>
       </form>
 
+      <AdminFeedback feedback={actionFeedback} />
+
       {loading ? (
-        <p className="text-text-muted text-sm">Loading...</p>
+        <ListSkeleton label="Loading links" rows={3} />
+      ) : loadError ? (
+        <AdminLoadError onRetry={loadLinks} />
       ) : (
         <div className="space-y-2">
           {links.map(function (link) {
@@ -415,9 +467,12 @@ function ReportsTab() {
   var [reports, setReports] = useState([]);
   var [statusFilter, setStatusFilter] = useState("pending");
   var [loading, setLoading] = useState(true);
+  var [loadError, setLoadError] = useState(false);
+  var [actionFeedback, setActionFeedback] = useState(null);
 
   var loadReports = async function () {
     setLoading(true);
+    setLoadError(false);
     try {
       var res = await api.get("/admin/reports", {
         params: { status: statusFilter },
@@ -425,6 +480,7 @@ function ReportsTab() {
       setReports(res.data.reports);
     } catch (err) {
       console.error(err);
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -441,20 +497,24 @@ function ReportsTab() {
 
   var handleAction = async function (id) {
     if (!confirm("Deactivate the reported link?")) return;
+    setActionFeedback(null);
     try {
       await api.post("/admin/reports/" + id + "/action");
+      setActionFeedback({ type: "success", message: "Link deactivated and report actioned." });
       loadReports();
     } catch (err) {
-      alert("Failed to action report");
+      setActionFeedback({ type: "error", message: err.response?.data?.message || "We couldn’t action this report. Please try again." });
     }
   };
 
   var handleDismiss = async function (id) {
+    setActionFeedback(null);
     try {
       await api.post("/admin/reports/" + id + "/dismiss");
+      setActionFeedback({ type: "success", message: "Report dismissed." });
       loadReports();
     } catch (err) {
-      alert("Failed to dismiss report");
+      setActionFeedback({ type: "error", message: err.response?.data?.message || "We couldn’t dismiss this report. Please try again." });
     }
   };
 
@@ -473,8 +533,12 @@ function ReportsTab() {
         <option value="all">All</option>
       </select>
 
+      <AdminFeedback feedback={actionFeedback} />
+
       {loading ? (
-        <p className="text-text-muted text-sm">Loading...</p>
+        <ListSkeleton label="Loading reports" rows={2} />
+      ) : loadError ? (
+        <AdminLoadError onRetry={loadReports} />
       ) : reports.length === 0 ? (
         <p className="text-text-muted text-sm">No reports here.</p>
       ) : (
@@ -539,9 +603,12 @@ function BioPagesTab() {
   var [page, setPage] = useState(1);
   var [pages_count, setPagesCount] = useState(1);
   var [loading, setLoading] = useState(true);
+  var [loadError, setLoadError] = useState(false);
+  var [actionFeedback, setActionFeedback] = useState(null);
 
   var loadPages = async function () {
     setLoading(true);
+    setLoadError(false);
     try {
       var res = await api.get("/admin/bio-pages", {
         params: { search: search, page: page },
@@ -550,6 +617,7 @@ function BioPagesTab() {
       setPagesCount(res.data.pages_count);
     } catch (err) {
       console.error(err);
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -571,21 +639,25 @@ function BioPagesTab() {
   };
 
   var handleTogglePublish = async function (id) {
+    setActionFeedback(null);
     try {
       await api.post("/admin/bio-pages/" + id + "/toggle-publish");
+      setActionFeedback({ type: "success", message: "Bio page visibility updated." });
       loadPages();
     } catch (err) {
-      alert("Failed to update page");
+      setActionFeedback({ type: "error", message: err.response?.data?.message || "We couldn’t update this bio page. Please try again." });
     }
   };
 
   var handleDelete = async function (id) {
     if (!confirm("Delete this bio page permanently?")) return;
+    setActionFeedback(null);
     try {
       await api.delete("/admin/bio-pages/" + id);
+      setActionFeedback({ type: "success", message: "Bio page deleted." });
       loadPages();
     } catch (err) {
-      alert("Failed to delete page");
+      setActionFeedback({ type: "error", message: err.response?.data?.message || "We couldn’t delete this bio page. Please try again." });
     }
   };
 
@@ -608,8 +680,12 @@ function BioPagesTab() {
         </button>
       </form>
 
+      <AdminFeedback feedback={actionFeedback} />
+
       {loading ? (
-        <p className="text-text-muted text-sm">Loading...</p>
+        <ListSkeleton label="Loading bio pages" rows={3} />
+      ) : loadError ? (
+        <AdminLoadError onRetry={loadPages} />
       ) : (
         <div className="space-y-2">
           {pages.map(function (p) {
@@ -698,9 +774,11 @@ function BillingTab() {
   var [transactions, setTransactions] = useState([]);
   var [view, setView] = useState("users"); // "users" | "transactions"
   var [loading, setLoading] = useState(true);
+  var [loadError, setLoadError] = useState(false);
 
   var loadAll = async function () {
     setLoading(true);
+    setLoadError(false);
     try {
       var overviewRes = await api.get("/admin/billing/overview");
       setOverview(overviewRes.data);
@@ -714,6 +792,7 @@ function BillingTab() {
       }
     } catch (err) {
       console.error(err);
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -778,8 +857,12 @@ function BillingTab() {
       </div>
 
       {loading ? (
-        <p className="text-text-muted text-sm">Loading...</p>
-      ) : view === "users" ? (
+        <ListSkeleton label="Loading billing data" rows={2} />
+      ) : loadError ? (
+        <AdminLoadError onRetry={loadAll} />
+      ) : view === "users" ? users.length === 0 ? (
+        <p className="text-sm text-text-muted" role="status">No subscriber accounts yet.</p>
+      ) : (
         <div className="space-y-2">
           {users.map(function (u) {
             var statusLabel =
@@ -824,6 +907,8 @@ function BillingTab() {
             );
           })}
         </div>
+      ) : transactions.length === 0 ? (
+        <p className="text-sm text-text-muted" role="status">No transactions yet.</p>
       ) : (
         <div className="space-y-2">
           {transactions.map(function (t) {
@@ -865,16 +950,24 @@ function BillingTab() {
 function AdminDashboard() {
   var [tab, setTab] = useState("overview");
   var [stats, setStats] = useState(null);
+  var [statsLoading, setStatsLoading] = useState(true);
+  var [statsError, setStatsError] = useState(false);
+
+  var loadStats = async function () {
+    setStatsLoading(true);
+    setStatsError(false);
+    try {
+      var res = await api.get("/admin/stats");
+      setStats(res.data);
+    } catch (err) {
+      console.error(err);
+      setStatsError(true);
+    } finally {
+      setStatsLoading(false);
+    }
+  };
 
   useEffect(function () {
-    var loadStats = async function () {
-      try {
-        var res = await api.get("/admin/stats");
-        setStats(res.data);
-      } catch (err) {
-        console.error(err);
-      }
-    };
     loadStats();
   }, []);
 
@@ -890,14 +983,10 @@ function AdminDashboard() {
   return (
     <div className="min-h-screen bg-ink">
       <Navbar />
-      <div className="max-w-3xl mx-auto px-4 py-8 space-y-6">
+      <div className="mx-auto max-w-6xl space-y-7 px-5 py-10 sm:px-8">
         <div>
-          <p className="text-xs uppercase tracking-widest text-wire font-mono mb-1">
-            Admin
-          </p>
-          <h1 className="text-2xl font-display font-bold text-white">
-            Control panel
-          </h1>
+          <p className="mb-2 text-sm text-text-muted">Workspace controls</p>
+          <h1 className="text-3xl font-display font-semibold tracking-tight text-white sm:text-4xl">Administration</h1>
         </div>
 
         <div className="flex gap-1 border-b border-white/10 overflow-x-auto scrollbar-none [&::-webkit-scrollbar]:hidden">
@@ -928,7 +1017,11 @@ function AdminDashboard() {
         </div>
 
         {tab === "overview" ? (
-          stats ? (
+          statsLoading ? (
+            <AdminStatsSkeleton count={5} />
+          ) : statsError ? (
+            <AdminLoadError onRetry={loadStats} />
+          ) : stats ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
               <StatCard label="Total users" value={stats.totalUsers} />
               <StatCard label="Total links" value={stats.totalLinks} />
@@ -937,7 +1030,7 @@ function AdminDashboard() {
               <StatCard label="Pending reports" value={stats.pendingReports} />
             </div>
           ) : (
-            <p className="text-text-muted text-sm">Loading stats...</p>
+            <AdminStatsSkeleton count={5} />
           )
         ) : null}
 

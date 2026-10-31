@@ -1,20 +1,18 @@
 import Link from "next/link";
+import PublicHeader from "@/components/PublicHeader";
 
 export const metadata = {
-  title: "Terms of Service - ShortLink",
+  title: "Terms of service",
 };
 
 export default function TermsPage() {
   return (
     <div className="min-h-screen bg-ink">
-      <div className="max-w-2xl mx-auto px-4 py-12 space-y-6 text-text-muted text-sm leading-relaxed">
+      <PublicHeader />
+      <div className="mx-auto max-w-2xl space-y-8 px-5 py-12 text-sm leading-7 text-text-muted sm:px-8">
         <div>
-          <p className="text-xs uppercase tracking-widest text-wire font-mono mb-1">
-            Legal
-          </p>
-          <h1 className="text-2xl font-display font-bold text-white">
-            Terms of Service
-          </h1>
+          <p className="mb-2 text-sm text-text-muted">Legal</p>
+          <h1 className="text-3xl font-display font-semibold tracking-tight text-white">Terms of service</h1>
           <p className="text-xs text-text-muted mt-2">
             Last updated: July 2026
           </p>

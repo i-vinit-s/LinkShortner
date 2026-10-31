@@ -5,29 +5,39 @@ import Link from "next/link";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import Navbar from "@/components/Navbar";
 import api from "@/lib/api";
+import { ListSkeleton } from "@/components/LoadingSkeleton";
 
 function BioPagesList() {
   var [pages, setPages] = useState([]);
   var [loading, setLoading] = useState(true);
-
-  var loadPages = async function () {
-    try {
-      var res = await api.get("/bio/mine");
-      setPages(res.data.pages);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  var [loadError, setLoadError] = useState("");
+  var [reloadKey, setReloadKey] = useState(0);
+  var [deletingId, setDeletingId] = useState(null);
+  var [deleteFeedback, setDeleteFeedback] = useState(null);
 
   useEffect(function () {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- loadPages is also called from the search form and toggle/delete handlers; refetching on page change is intended
+    var cancelled = false;
+    var loadPages = async function () {
+      try {
+        var res = await api.get("/bio/mine");
+        if (!cancelled) setPages(res.data.pages);
+      } catch (err) {
+        console.error(err);
+        if (!cancelled) setLoadError("We couldn't load your bio pages. Check your connection and try again.");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
     loadPages();
-  }, []);
+    return function () {
+      cancelled = true;
+    };
+  }, [reloadKey]);
 
   var handleDelete = async function (id) {
     if (!confirm("Delete this page? This cannot be undone.")) return;
+    setDeleteFeedback(null);
+    setDeletingId(id);
     try {
       await api.delete("/bio/" + id);
       setPages(function (prev) {
@@ -35,13 +45,23 @@ function BioPagesList() {
           return p._id !== id;
         });
       });
+      setDeleteFeedback({ type: "success", message: "Bio page deleted." });
     } catch (err) {
-      alert("Failed to delete page");
+      setDeleteFeedback({
+        type: "error",
+        message: err.response?.data?.message || "We couldn’t delete this bio page. Please try again.",
+      });
+    } finally {
+      setDeletingId(null);
     }
   };
 
   if (loading) {
-    return <p className="text-text-muted text-sm">Loading...</p>;
+    return <ListSkeleton label="Loading bio pages" rows={2} />;
+  }
+
+  if (loadError) {
+    return <div className="flex flex-col gap-3 rounded-xl border border-danger/25 bg-danger/5 p-5 sm:flex-row sm:items-center sm:justify-between"><p className="text-sm text-text-muted" role="alert">{loadError}</p><button onClick={function () { setLoadError(""); setLoading(true); setReloadKey(function (key) { return key + 1; }); }} className="ui-button-secondary focus-ring w-fit text-sm">Retry</button></div>;
   }
 
   return (
@@ -52,11 +72,21 @@ function BioPagesList() {
         </h1>
         <Link
           href="/dashboard/bio/new"
-          className="bg-signal text-ink font-display font-medium rounded-md px-4 py-2 hover:brightness-110 transition text-sm"
+          className="ui-button-primary focus-ring inline-flex items-center text-sm"
         >
-          + New page
+          New page
         </Link>
       </div>
+
+      {deleteFeedback ? (
+        <p
+          className={`rounded-lg border px-4 py-3 text-sm ${deleteFeedback.type === "error" ? "border-danger/25 bg-danger/5 text-danger" : "border-led/25 bg-led/5 text-led"}`}
+          role={deleteFeedback.type === "error" ? "alert" : "status"}
+          aria-live={deleteFeedback.type === "error" ? "assertive" : "polite"}
+        >
+          {deleteFeedback.message}
+        </p>
+      ) : null}
 
       {pages.length === 0 ? (
         <div className="border border-dashed border-white/15 rounded-lg p-8 text-center">
@@ -71,7 +101,7 @@ function BioPagesList() {
             return (
               <div
                 key={p._id}
-                className="bg-surface border border-white/10 rounded-lg p-4 flex items-center justify-between gap-3"
+                className="bg-surface border border-white/10 rounded-xl p-4 flex items-center justify-between gap-3"
               >
                 <div className="min-w-0">
                   <p className="text-white text-sm font-medium truncate">
@@ -102,17 +132,19 @@ function BioPagesList() {
                   </span>
                   <Link
                     href={"/dashboard/bio/" + p._id}
-                    className="text-xs border border-white/15 rounded-md px-3 py-1.5 text-text-muted hover:text-white"
+                    className="ui-button-secondary focus-ring text-sm"
                   >
                     Edit
                   </Link>
                   <button
+                    type="button"
                     onClick={function () {
                       handleDelete(p._id);
                     }}
-                    className="text-xs border border-danger/30 text-danger rounded-md px-3 py-1.5 hover:bg-danger/10"
+                    disabled={deletingId === p._id}
+                    className="focus-ring min-h-11 rounded-md border border-danger/30 px-3 text-sm text-danger hover:bg-danger/10 disabled:cursor-wait disabled:opacity-50"
                   >
-                    Delete
+                    {deletingId === p._id ? "Deleting…" : "Delete"}
                   </button>
                 </div>
               </div>
@@ -129,7 +161,7 @@ export default function BioPagesListPage() {
     <ProtectedRoute>
       <div className="min-h-screen bg-ink">
         <Navbar />
-        <div className="max-w-3xl mx-auto px-4 py-8">
+        <div className="mx-auto max-w-5xl px-5 py-10 sm:px-8">
           <BioPagesList />
         </div>
       </div>

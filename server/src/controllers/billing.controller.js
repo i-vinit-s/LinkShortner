@@ -2,7 +2,9 @@ const crypto = require("crypto");
 const razorpay = require("../config/razorpay");
 const User = require("../models/User");
 const Transaction = require("../models/Transaction");
+const WebhookEvent = require("../models/WebhookEvent");
 const { syncUserPlan } = require("../utils/planSync");
+const { verifyWebhookSignature } = require("../utils/webhookSignature");
 
 exports.createSubscription = async function (req, res) {
   try {
@@ -156,18 +158,29 @@ exports.resumeSubscription = async function (req, res) {
 exports.handleWebhook = async function (req, res) {
   try {
     var signature = req.headers["x-razorpay-signature"];
-    var expectedSignature = crypto
-      .createHmac("sha256", process.env.RAZORPAY_WEBHOOK_SECRET)
-      .update(req.rawBody)
-      .digest("hex");
-
-    if (signature !== expectedSignature) {
-      console.error("Invalid Razorpay webhook signature");
+    if (
+      !verifyWebhookSignature(
+        req.rawBody,
+        signature,
+        process.env.RAZORPAY_WEBHOOK_SECRET,
+      )
+    ) {
       return res.status(400).json({ message: "Invalid signature" });
     }
 
     var event = req.body.event;
     var payload = req.body.payload;
+    var eventId = req.headers["x-razorpay-event-id"];
+    if (!eventId) {
+      eventId = crypto.createHash("sha256").update(req.rawBody).digest("hex");
+    }
+
+    try {
+      await WebhookEvent.create({ eventId: eventId, event: event });
+    } catch (err) {
+      if (err && err.code === 11000) return res.json({ status: "ok" });
+      throw err;
+    }
 
     if (event === "subscription.activated") {
       var sub = payload.subscription.entity;
@@ -257,6 +270,11 @@ exports.handleWebhook = async function (req, res) {
 
     res.json({ status: "ok" });
   } catch (err) {
+    if (req.body && req.rawBody) {
+      var failedEventId = req.headers["x-razorpay-event-id"] ||
+        crypto.createHash("sha256").update(req.rawBody).digest("hex");
+      await WebhookEvent.deleteOne({ eventId: failedEventId }).catch(function () {});
+    }
     console.error("Webhook processing error:", err);
     res.status(500).json({ message: "Webhook processing failed" });
   }

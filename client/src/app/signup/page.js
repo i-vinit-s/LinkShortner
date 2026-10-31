@@ -4,6 +4,8 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import PasswordChecklist from "@/components/PasswordChecklist";
+import Link from "next/link";
+import { AuthSkeleton } from "@/components/LoadingSkeleton";
 
 export default function SignupPage() {
   var [form, setForm] = useState({ name: "", email: "", password: "" });
@@ -48,63 +50,33 @@ export default function SignupPage() {
   };
 
   if (authState.loading || authState.user) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-ink">
-        <p className="text-text-muted text-sm">Loading...</p>
-      </div>
-    );
+    return <AuthSkeleton label="Checking your session" />;
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-ink px-4">
+      <div className="flex min-h-screen items-center justify-center bg-[#000000] px-5 py-12">
       <form
         onSubmit={handleSubmit}
-        className="bg-surface border border-white/10 p-8 rounded-xl w-full max-w-sm space-y-4"
+        className="w-full max-w-md space-y-5 rounded-2xl border border-white/10 bg-[#181818] p-6 shadow-2xl sm:p-8"
       >
         <div>
-          <p className="text-xs uppercase tracking-widest text-wire font-mono mb-1">
-            Sign up
-          </p>
-          <h1 className="text-2xl font-display font-bold text-white">
-            Create account
-          </h1>
+          <p className="mb-2 text-sm text-[#777777]">A clearer home for every link.</p>
+          <h1 className="font-display text-3xl font-semibold tracking-tight text-white">Create account</h1>
+          <p className="mt-2 text-sm leading-6 text-[#9B9B9B]">Save links permanently and unlock the full workspace.</p>
         </div>
 
         {error ? (
-          <p className="text-sm text-danger bg-danger/10 border border-danger/30 rounded-md px-3 py-2">
+          <p className="rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger" role="alert" aria-live="assertive">
             {error}
           </p>
         ) : null}
 
-        <input
-          name="name"
-          placeholder="Name"
-          value={form.name}
-          onChange={handleChange}
-          className="w-full bg-surface-raised border border-white/10 rounded-md px-3 py-2.5 text-white placeholder:text-text-muted focus:outline-none focus:border-signal"
-          required
-        />
-        <input
-          name="email"
-          type="email"
-          placeholder="Email"
-          value={form.email}
-          onChange={handleChange}
-          className="w-full bg-surface-raised border border-white/10 rounded-md px-3 py-2.5 text-white placeholder:text-text-muted focus:outline-none focus:border-signal"
-          required
-        />
-        <input
-          name="password"
-          type="password"
-          placeholder="Password"
-          value={form.password}
-          onChange={handleChange}
-          className="w-full bg-surface-raised border border-white/10 rounded-md px-3 py-2.5 text-white placeholder:text-text-muted focus:outline-none focus:border-signal"
-          required
-        />
+        <label className="block text-sm font-medium text-white">Name<input name="name" autoComplete="name" placeholder="Your name" value={form.name} onChange={handleChange} className="ui-input focus-ring mt-2" required /></label>
+        <label className="block text-sm font-medium text-white">Email<input name="email" type="email" autoComplete="email" placeholder="you@example.com" value={form.email} onChange={handleChange} className="ui-input focus-ring mt-2" required /></label>
+        <label className="block text-sm font-medium text-white">Password<input name="password" type="password" autoComplete="new-password" placeholder="Create a strong password" value={form.password} onChange={handleChange} className="ui-input focus-ring mt-2" required /></label>
 
         {form.password ? (
-          <div className="bg-surface-raised border border-white/10 rounded-md p-3">
+          <div className="rounded-lg border border-white/10 bg-[#1F1F1F] p-3">
             <PasswordChecklist password={form.password} />
           </div>
         ) : null}
@@ -112,16 +84,17 @@ export default function SignupPage() {
         <button
           type="submit"
           disabled={loading}
-          className="w-full bg-signal text-ink font-display font-medium rounded-md py-2.5 hover:brightness-110 disabled:opacity-50"
+          aria-busy={loading}
+          className="ui-button-primary focus-ring w-full"
         >
           {loading ? "Creating account..." : "Create account"}
         </button>
 
         <p className="text-sm text-text-muted text-center">
           Already have an account?{" "}
-          <a href="/login" className="text-wire hover:underline">
+          <Link href="/login" className="text-wire hover:underline">
             Log in
-          </a>
+          </Link>
         </p>
       </form>
     </div>

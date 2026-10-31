@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import api from "@/lib/api";
+import PublicHeader from "@/components/PublicHeader";
 
 export default function ReportPage() {
   var [form, setForm] = useState({
@@ -37,15 +38,13 @@ export default function ReportPage() {
   };
 
   return (
-    <div className="min-h-screen bg-ink flex items-center justify-center px-4">
+    <div className="min-h-screen bg-ink">
+      <PublicHeader />
+      <main className="flex min-h-[calc(100vh-4rem)] items-center justify-center px-5 py-12">
       <div className="max-w-md w-full space-y-6">
         <div>
-          <p className="text-xs uppercase tracking-widest text-wire font-mono mb-1">
-            Trust &amp; safety
-          </p>
-          <h1 className="text-2xl font-display font-bold text-white">
-            Report a link
-          </h1>
+          <p className="mb-2 text-sm text-text-muted">Help keep the network useful</p>
+          <h1 className="text-3xl font-display font-semibold tracking-tight text-white">Report a link</h1>
           <p className="text-sm text-text-muted mt-2">
             If a short link is being used for phishing, malware, or other
             harmful purposes, let us know and we&apos;ll investigate.
@@ -53,59 +52,62 @@ export default function ReportPage() {
         </div>
 
         {status === "success" ? (
-          <div className="bg-led/10 border border-led/30 rounded-md p-4 text-sm text-led">
+          <div className="bg-led/10 border border-led/30 rounded-md p-4 text-sm text-led" role="status" aria-live="polite">
             Thank you — your report has been submitted and will be reviewed
             shortly.
           </div>
         ) : (
           <form
             onSubmit={handleSubmit}
-            className="bg-surface border border-white/10 rounded-lg p-6 space-y-3"
+            aria-busy={status === "submitting"}
+            className="bg-surface border border-white/10 rounded-2xl p-6 space-y-4 shadow-xl"
           >
             {errorMsg ? (
-              <p className="text-sm text-danger bg-danger/10 border border-danger/30 rounded-md px-3 py-2">
+              <p className="text-sm text-danger bg-danger/10 border border-danger/30 rounded-md px-3 py-2" role="alert" aria-live="assertive">
                 {errorMsg}
               </p>
             ) : null}
 
-            <input
+            <label className="block text-sm font-medium text-white">Short link or code<input
               name="shortCodeOrUrl"
               value={form.shortCodeOrUrl}
               onChange={handleChange}
-              placeholder="Short link or code (e.g. yourapp.com/abc123)"
-              className="w-full bg-surface-raised border border-white/10 rounded-md px-3 py-2.5 text-white placeholder:text-text-muted focus:outline-none focus:border-signal"
+              placeholder="shortlink.app/abc123"
+              className="ui-input focus-ring mt-2"
               required
-            />
+            /></label>
 
-            <textarea
+            <label className="block text-sm font-medium text-white">What should we know?<textarea
               name="reason"
               value={form.reason}
               onChange={handleChange}
-              placeholder="Describe why you're reporting this link"
+              placeholder="Tell us what looks harmful or misleading"
               rows={4}
-              className="w-full bg-surface-raised border border-white/10 rounded-md px-3 py-2.5 text-white placeholder:text-text-muted focus:outline-none focus:border-signal resize-none"
+              className="ui-input focus-ring mt-2 h-28 resize-none py-3"
               required
-            />
+            /></label>
 
-            <input
+            <label className="block text-sm font-medium text-white">Email <span className="font-normal text-text-muted">optional</span><input
               name="reporterEmail"
               type="email"
               value={form.reporterEmail}
               onChange={handleChange}
-              placeholder="Your email (optional, for follow-up)"
-              className="w-full bg-surface-raised border border-white/10 rounded-md px-3 py-2.5 text-white placeholder:text-text-muted focus:outline-none focus:border-signal"
-            />
+              placeholder="you@example.com"
+              className="ui-input focus-ring mt-2"
+            /></label>
 
             <button
               type="submit"
               disabled={status === "submitting"}
-              className="w-full bg-signal text-ink font-display font-medium rounded-md py-2.5 hover:brightness-110 disabled:opacity-50"
+              aria-busy={status === "submitting"}
+              className="ui-button-primary focus-ring w-full"
             >
               {status === "submitting" ? "Submitting..." : "Submit report"}
             </button>
           </form>
         )}
       </div>
+      </main>
     </div>
   );
 }

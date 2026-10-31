@@ -1,4 +1,5 @@
 import { BioIcon } from "@/components/BioIcons";
+import Link from "next/link";
 import {
   normalizeTheme,
   resolveThemeColors,
@@ -176,7 +177,7 @@ export default function BioPageView(props) {
             className="text-xs pt-4"
             style={{ color: colors.text, opacity: 0.5 }}
           >
-            <a href="/">Made with ShortLink</a>
+            <Link href="/">Made with ShortLink</Link>
           </p>
         ) : null}
       </div>

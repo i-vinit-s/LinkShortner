@@ -53,27 +53,30 @@ export default function QuickQrForm(props) {
     <div className="bg-surface border border-white/10 rounded-lg p-5 space-y-4">
       <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-2">
         <input
+          id="quick-qr-url"
           value={url}
           onChange={function (e) {
             setUrl(e.target.value);
           }}
           placeholder="Paste any URL to generate a QR code..."
+          aria-label="URL to turn into a QR code"
           className="flex-1 bg-surface-raised border border-white/10 rounded-md px-3 py-2.5 text-white placeholder:text-text-muted focus:outline-none focus:border-signal"
           required
         />
         <button
           type="submit"
           disabled={loading}
+          aria-busy={loading}
           className="bg-signal text-ink font-display font-medium rounded-md px-5 py-2.5 hover:brightness-110 transition disabled:opacity-50 shrink-0"
         >
           {loading ? "Generating..." : "Generate QR"}
         </button>
       </form>
 
-      {error ? <p className="text-sm text-danger">{error}</p> : null}
+      {error ? <p className="text-sm text-danger" role="alert">{error}</p> : null}
 
       {result ? (
-        <div className="flex flex-col items-center gap-3 pt-2">
+        <div className="flex flex-col items-center gap-3 pt-2" role="status" aria-live="polite">
           <div className="bg-white rounded-lg p-4">
             <img
               src={result.qrDataUrl}

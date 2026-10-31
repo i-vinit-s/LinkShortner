@@ -22,4 +22,17 @@ const transactionSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
+// Razorpay retries can resend the same payment event. A payment ID is stable
+// across retries, while failed payments may not include one, hence sparse.
+transactionSchema.index({ razorpayPaymentId: 1 }, { unique: true, sparse: true });
+transactionSchema.index(
+  { userId: 1, createdAt: -1 },
+  { name: "query_user_created_at_desc" },
+);
+transactionSchema.index(
+  { status: 1, createdAt: -1 },
+  { name: "query_status_created_at_desc" },
+);
+transactionSchema.index({ createdAt: -1 }, { name: "query_created_at_desc" });
+
 module.exports = mongoose.model("Transaction", transactionSchema);

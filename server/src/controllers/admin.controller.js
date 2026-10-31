@@ -6,6 +6,7 @@ const Report = require("../models/Report");
 const ClickEvent = require("../models/ClickEvent");
 const redisClient = require("../config/redis");
 const Transaction = require("../models/Transaction");
+const { getPageBounds } = require("../utils/pagination");
 
 // --- Dashboard summary ---
 exports.getStats = async function (req, res) {
@@ -32,7 +33,6 @@ exports.getStats = async function (req, res) {
 // --- Users ---
 exports.listUsers = async function (req, res) {
   try {
-    var page = parseInt(req.query.page, 10) || 1;
     var limit = 20;
     var search = (req.query.search || "").trim();
 
@@ -46,19 +46,21 @@ exports.listUsers = async function (req, res) {
       };
     }
 
+    var total = await User.countDocuments(filter);
+    var pageInfo = getPageBounds(req.query.page, total, limit);
+    var page = pageInfo.page;
+
     var users = await User.find(filter)
       .select("-password -otpHash")
       .sort({ createdAt: -1 })
       .skip((page - 1) * limit)
       .limit(limit);
 
-    var total = await User.countDocuments(filter);
-
     res.json({
       users: users,
       total: total,
       page: page,
-      pages: Math.ceil(total / limit),
+      pages: pageInfo.pages,
     });
   } catch (err) {
     console.error(err);
@@ -99,7 +101,6 @@ exports.toggleUserBan = async function (req, res) {
 // --- Links ---
 exports.listAllLinks = async function (req, res) {
   try {
-    var page = parseInt(req.query.page, 10) || 1;
     var limit = 20;
     var search = (req.query.search || "").trim();
 
@@ -113,19 +114,21 @@ exports.listAllLinks = async function (req, res) {
       };
     }
 
+    var total = await Link.countDocuments(filter);
+    var pageInfo = getPageBounds(req.query.page, total, limit);
+    var page = pageInfo.page;
+
     var links = await Link.find(filter)
       .populate("userId", "name email")
       .sort({ createdAt: -1 })
       .skip((page - 1) * limit)
       .limit(limit);
 
-    var total = await Link.countDocuments(filter);
-
     res.json({
       links: links,
       total: total,
       page: page,
-      pages: Math.ceil(total / limit),
+      pages: pageInfo.pages,
     });
   } catch (err) {
     console.error(err);
@@ -205,7 +208,6 @@ exports.dismissReport = async function (req, res) {
 
 exports.listBioPages = async function (req, res) {
   try {
-    var page = parseInt(req.query.page, 10) || 1;
     var limit = 20;
     var search = (req.query.search || "").trim();
 
@@ -214,19 +216,21 @@ exports.listBioPages = async function (req, res) {
       filter = { slug: { $regex: search, $options: "i" } };
     }
 
+    var total = await BioPage.countDocuments(filter);
+    var pageInfo = getPageBounds(req.query.page, total, limit);
+    var page = pageInfo.page;
+
     var pages = await BioPage.find(filter)
       .populate("userId", "name email")
       .sort({ createdAt: -1 })
       .skip((page - 1) * limit)
       .limit(limit);
 
-    var total = await BioPage.countDocuments(filter);
-
     res.json({
       pages: pages,
       total: total,
       page: page,
-      pages_count: Math.ceil(total / limit),
+      pages_count: pageInfo.pages,
     });
   } catch (err) {
     console.error(err);
@@ -302,12 +306,15 @@ exports.getBillingOverview = async function (req, res) {
 
 exports.listBillingUsers = async function (req, res) {
   try {
-    var page = parseInt(req.query.page, 10) || 1;
     var limit = 20;
     var planFilter = req.query.plan || "all";
 
     var filter = {};
     if (planFilter !== "all") filter.plan = planFilter;
+
+    var total = await User.countDocuments(filter);
+    var pageInfo = getPageBounds(req.query.page, total, limit);
+    var page = pageInfo.page;
 
     var users = await User.find(filter)
       .select(
@@ -317,13 +324,11 @@ exports.listBillingUsers = async function (req, res) {
       .skip((page - 1) * limit)
       .limit(limit);
 
-    var total = await User.countDocuments(filter);
-
     res.json({
       users: users,
       total: total,
       page: page,
-      pages: Math.ceil(total / limit),
+      pages: pageInfo.pages,
     });
   } catch (err) {
     console.error(err);
@@ -333,8 +338,11 @@ exports.listBillingUsers = async function (req, res) {
 
 exports.listTransactions = async function (req, res) {
   try {
-    var page = parseInt(req.query.page, 10) || 1;
     var limit = 20;
+
+    var total = await Transaction.countDocuments();
+    var pageInfo = getPageBounds(req.query.page, total, limit);
+    var page = pageInfo.page;
 
     var transactions = await Transaction.find()
       .populate("userId", "name email")
@@ -342,13 +350,11 @@ exports.listTransactions = async function (req, res) {
       .skip((page - 1) * limit)
       .limit(limit);
 
-    var total = await Transaction.countDocuments();
-
     res.json({
       transactions: transactions,
       total: total,
       page: page,
-      pages: Math.ceil(total / limit),
+      pages: pageInfo.pages,
     });
   } catch (err) {
     console.error(err);

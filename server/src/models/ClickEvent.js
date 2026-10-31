@@ -20,4 +20,9 @@ const clickEventSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
+clickEventSchema.index(
+  { linkId: 1, timestamp: -1, _id: -1 },
+  { name: "query_link_timestamp_id_desc" },
+);
+
 module.exports = mongoose.model("ClickEvent", clickEventSchema);

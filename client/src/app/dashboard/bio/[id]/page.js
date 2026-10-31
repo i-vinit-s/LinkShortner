@@ -12,14 +12,10 @@ export default function EditBioPage() {
     <ProtectedRoute>
       <div className="min-h-screen bg-ink">
         <Navbar />
-        <div className="max-w-4xl mx-auto px-4 py-8">
+        <div className="mx-auto max-w-5xl px-5 py-10 sm:px-8">
           <div className="mb-6">
-            <p className="text-xs uppercase tracking-widest text-wire font-mono mb-1">
-              Bio Page
-            </p>
-            <h1 className="text-2xl font-display font-bold text-white">
-              Edit page
-            </h1>
+            <p className="mb-2 text-sm text-text-muted">Bio page</p>
+            <h1 className="text-3xl font-display font-semibold tracking-tight text-white">Edit page</h1>
           </div>
           <BioBuilder pageId={params.id} />
         </div>

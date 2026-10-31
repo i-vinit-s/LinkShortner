@@ -9,12 +9,16 @@ import LinkCard from "@/components/LinkCard";
 import LinkFilterBar from "@/components/LinkFilterBar";
 import api from "@/lib/api";
 import BillingStatus from "@/components/BillingStatus";
+import { ListSkeleton } from "@/components/LoadingSkeleton";
 
 function DashboardContent() {
   var [links, setLinks] = useState([]);
   var [loading, setLoading] = useState(true);
+  var [loadError, setLoadError] = useState("");
+  var [reloadKey, setReloadKey] = useState(0);
   var [selectedIds, setSelectedIds] = useState([]);
   var [bulkLoading, setBulkLoading] = useState(false);
+  var [actionFeedback, setActionFeedback] = useState(null);
 
   var [search, setSearch] = useState("");
   var [statusFilter, setStatusFilter] = useState("all");
@@ -26,20 +30,34 @@ function DashboardContent() {
   var [activeTab, setActiveTab] = useState("url"); // "url" | "qr"
 
   useEffect(function () {
+    var cancelled = false;
     var loadData = async function () {
       try {
-        var linksRes = await api.get("/links/mine");
-        setLinks(linksRes.data.links);
-        var tagsRes = await api.get("/links/tags");
-        setAvailableTags(tagsRes.data.tags);
+        var results = await Promise.all([
+          api.get("/links/mine"),
+          api.get("/links/tags"),
+        ]);
+        if (cancelled) return;
+        setLinks(results[0].data.links);
+        setAvailableTags(results[1].data.tags);
       } catch (err) {
         console.error(err);
+        if (!cancelled) setLoadError("We couldn't load your links. Check your connection and try again.");
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
     loadData();
-  }, []);
+    return function () {
+      cancelled = true;
+    };
+  }, [reloadKey]);
+
+  var retryLoad = function () {
+    setLoading(true);
+    setLoadError("");
+    setReloadKey(function (key) { return key + 1; });
+  };
 
   var handleCreated = function (newLink) {
     setLinks(function (prev) {
@@ -50,6 +68,7 @@ function DashboardContent() {
     var handleDelete = async function (id) {
       if (!confirm("Deactivate this link? You can activate it again later."))
         return;
+      setActionFeedback(null);
       try {
         await api.delete("/links/" + id);
         // Keep the link in the list (greyed out) so it can be activated again
@@ -65,13 +84,13 @@ function DashboardContent() {
             return sid !== id;
           });
         });
+        setActionFeedback({ type: "success", message: "Link deactivated. You can reactivate it at any time." });
       } catch (err) {
         console.error(err);
-        alert(
-          err.response && err.response.data && err.response.data.message
-            ? err.response.data.message
-            : "Failed to deactivate link",
-        );
+        setActionFeedback({
+          type: "error",
+          message: err.response?.data?.message || "We couldn’t deactivate this link. Please try again.",
+        });
       }
   };
   
@@ -94,6 +113,7 @@ function DashboardContent() {
     };
 
     var handleReactivate = async function (id) {
+      setActionFeedback(null);
       try {
         await api.post("/links/" + id + "/reactivate");
         setLinks(function (prev) {
@@ -103,12 +123,12 @@ function DashboardContent() {
               : l;
           });
         });
+        setActionFeedback({ type: "success", message: "Link reactivated." });
       } catch (err) {
-        alert(
-          err.response && err.response.data && err.response.data.message
-            ? err.response.data.message
-            : "Failed to activate link",
-        );
+        setActionFeedback({
+          type: "error",
+          message: err.response?.data?.message || "We couldn’t reactivate this link. Please try again.",
+        });
       }
     };
 
@@ -128,6 +148,7 @@ function DashboardContent() {
     if (!confirm("Deactivate " + selectedIds.length + " selected link(s)?"))
       return;
 
+    setActionFeedback(null);
     setBulkLoading(true);
     try {
       await api.post("/links/bulk-delete", { ids: selectedIds });
@@ -139,9 +160,13 @@ function DashboardContent() {
         });
       });
       setSelectedIds([]);
+      setActionFeedback({ type: "success", message: "Selected links deactivated." });
     } catch (err) {
       console.error(err);
-      alert("Bulk delete failed");
+      setActionFeedback({
+        type: "error",
+        message: err.response?.data?.message || "We couldn’t deactivate the selected links. Please try again.",
+      });
     } finally {
       setBulkLoading(false);
     }
@@ -220,33 +245,50 @@ function DashboardContent() {
   };
 
   return (
-    <div className="min-h-screen bg-ink">
+    <div className="min-h-screen bg-[#000000]">
       <Navbar />
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 sm:py-10 space-y-5 sm:space-y-6 pb-28 sm:pb-10">
-        <div>
-          <p className="text-xs uppercase tracking-widest text-wire font-mono mb-1">
-            Dashboard
-          </p>
-          <h1 className="text-xl sm:text-2xl font-display font-bold text-white">
-            Your links
-          </h1>
+      <div className="mx-auto max-w-5xl space-y-6 px-5 py-8 pb-28 sm:px-8 sm:py-12 sm:pb-12">
+        <div className="flex flex-col gap-5 border-b border-white/10 pb-7 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="mb-2 text-sm text-text-muted">Your workspace</p>
+            <h1 className="font-display text-3xl font-semibold tracking-tight text-white sm:text-4xl">Links</h1>
+            <p className="mt-2 max-w-lg text-sm leading-6 text-text-muted">Create, organize, and understand the links you share.</p>
+          </div>
+          <div className="text-left sm:text-right"><p className="font-mono text-2xl text-white">{links.length}</p><p className="text-sm text-text-muted">total links</p></div>
         </div>
 
         <div className="space-y-4">
           <BillingStatus />
-          <div className="flex gap-2 border-b border-white/10">
+          {actionFeedback ? (
+            <div
+              className={`flex items-start justify-between gap-4 rounded-lg border px-4 py-3 text-sm ${actionFeedback.type === "error" ? "border-danger/25 bg-danger/5 text-danger" : "border-led/25 bg-led/5 text-led"}`}
+              role={actionFeedback.type === "error" ? "alert" : "status"}
+              aria-live={actionFeedback.type === "error" ? "assertive" : "polite"}
+            >
+              <p>{actionFeedback.message}</p>
+              <button
+                type="button"
+                onClick={function () { setActionFeedback(null); }}
+                aria-label="Dismiss message"
+                className="focus-ring -mr-1 -mt-1 shrink-0 rounded p-1 text-current/75 hover:text-current"
+              >
+                <span aria-hidden="true">×</span>
+              </button>
+            </div>
+          ) : null}
+          <div className="flex gap-1 border-b border-white/10">
             <button
               onClick={function () {
                 setActiveTab("url");
               }}
               className={
-                "text-sm px-3 py-2 border-b-2 transition-colors " +
+                "focus-ring rounded-t-md px-3 py-3 text-sm transition-colors " +
                 (activeTab === "url"
-                  ? "border-signal text-white"
-                  : "border-transparent text-text-muted hover:text-white")
+                  ? "bg-white/5 text-white"
+                  : "text-[#777777] hover:bg-white/5 hover:text-white")
               }
             >
-              Shorten URL
+              Links
             </button>
 
             <button
@@ -254,13 +296,13 @@ function DashboardContent() {
                 setActiveTab("qr");
               }}
               className={
-                "text-sm px-3 py-2 border-b-2 transition-colors " +
+                "focus-ring rounded-t-md px-3 py-3 text-sm transition-colors " +
                 (activeTab === "qr"
-                  ? "border-signal text-white"
-                  : "border-transparent text-text-muted hover:text-white")
+                  ? "bg-white/5 text-white"
+                  : "text-[#777777] hover:bg-white/5 hover:text-white")
               }
             >
-              Generate QR
+              QR codes
             </button>
           </div>
 
@@ -269,10 +311,11 @@ function DashboardContent() {
               <CreateLinkForm onCreated={handleCreated} />
 
               {loading ? (
-                <div className="space-y-3 animate-pulse">
-                  <div className="h-16 bg-surface rounded-lg" />
-                  <div className="h-16 bg-surface rounded-lg" />
-                  <div className="h-16 bg-surface rounded-lg" />
+                <ListSkeleton label="Loading links" rows={3} />
+              ) : loadError ? (
+                <div className="flex flex-col gap-3 rounded-xl border border-danger/25 bg-danger/5 p-5 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="text-sm text-text-muted" role="alert">{loadError}</p>
+                  <button onClick={retryLoad} className="ui-button-secondary focus-ring w-fit text-sm">Retry</button>
                 </div>
               ) : links.length === 0 ? (
                 <div className="border border-dashed border-white/15 rounded-lg p-8 text-center">
@@ -352,10 +395,7 @@ function DashboardContent() {
             <div className="space-y-6">
               <QuickQrForm
                 onSaved={function () {
-                  // Refresh the link list so the new QR-sourced link shows up immediately
-                  api.get("/links/mine").then(function (res) {
-                    setLinks(res.data.links);
-                  });
+                  retryLoad();
                 }}
               />
 
@@ -367,6 +407,12 @@ function DashboardContent() {
                   var qrLinks = links.filter(function (l) {
                     return l.source === "qr";
                   });
+                  if (loading) {
+                    return <ListSkeleton label="Loading your QR codes" rows={2} />;
+                  }
+                  if (loadError) {
+                    return <div className="flex flex-col gap-3 rounded-xl border border-danger/25 bg-danger/5 p-5 sm:flex-row sm:items-center sm:justify-between"><p className="text-sm text-text-muted" role="alert">{loadError}</p><button onClick={retryLoad} className="ui-button-secondary focus-ring w-fit text-sm">Retry</button></div>;
+                  }
                   if (qrLinks.length === 0) {
                     return (
                       <p className="text-text-muted text-sm">

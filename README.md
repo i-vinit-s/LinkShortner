@@ -129,6 +129,7 @@ Dark, fully responsive UI. Images are in [`docs/screenshots`](docs/screenshots).
 - Per-link dashboard: clicks over time, top referrers, device breakdown, top countries
 - Device/browser/OS parsing via `ua-parser-js`, approximate geolocation via `geoip-lite`
 - Click events are queued in Redis and drained in batches by a background worker (not written to MongoDB one-by-one) to keep the hot path fast
+- The click worker claims events into a Redis processing list, acknowledges only after persistence, recovers unacknowledged events after restart, retries transient failures with capped exponential backoff, and records processed/failed/retry/dead-letter counts. Stable event IDs prevent duplicate analytics rows, and link click totals are recomputed idempotently from persisted events. `/health` exposes aggregate queue depths and counters without event content.
 - Raw click-event CSV export per link
 
 ### Admin Dashboard
@@ -246,18 +247,24 @@ url-shortener/
 
 ### Prerequisites
 
-- Node.js 18+
-- MongoDB (local or Atlas)
-- Redis (local or hosted)
+- Node.js 20.19+ (required by Mongoose 9; also satisfies Next.js 16)
+- Docker with the Compose plugin, or separately managed MongoDB and Redis instances
 - An SMTP account for sending OTP emails (Gmail App Password works for development)
 - A Razorpay account (Test Mode is sufficient for local development)
 
 ### Backend Setup
 
+From the repository root, start the local data services. Compose binds them to `127.0.0.1` and persists local data in named volumes:
+
+```bash
+docker compose up -d mongo redis
+```
+
+Copy the example environment files (`server/.env.example` to `server/.env` and `client/.env.example` to `client/.env.local`). The example values are for local development only. Configure SMTP credentials to receive signup OTPs; configure Safe Browsing and Razorpay credentials only when testing those integrations.
+
 ```bash
 cd server
 npm install
-cp .env.example .env   # then fill in your own values
 npm run dev
 ```
 
@@ -267,12 +274,15 @@ The API runs on `http://localhost:5000` by default. Confirm it's healthy:
 curl http://localhost:5000/health
 ```
 
+### MongoDB query indexes
+
+Query indexes are declared in the Mongoose schemas. Review the named query-index plan with `cd server && npm run db:indexes:plan`; apply additive indexes to a development database with `npm run db:indexes:apply`. The script never drops indexes. For production, review the index build against deployment load first and set `CONFIRM_INDEX_BUILD=true` only for the approved maintenance run.
+
 ### Frontend Setup
 
 ```bash
 cd client
 npm install
-cp .env.example .env.local   # then fill in your own values
 npm run dev
 ```
 
@@ -336,6 +346,8 @@ The built-in keep-alive ping only prevents free-tier host spin-down while the pr
 |---|---|
 | `NEXT_PUBLIC_API_URL` | Base URL of the backend API (e.g. `http://localhost:5000/api/v1`) |
 | `NEXT_PUBLIC_APP_URL` | The domain short links and bio pages are displayed/generated with |
+
+`NEXT_PUBLIC_*` values are included in browser-facing builds and must never contain secrets. Keep real credentials in local ignored `.env` files or the deployment platform's secret manager; do not commit them.
 
 ---
 
@@ -439,13 +451,14 @@ All routes below require an authenticated session **and** `isAdmin: true`.
 
 | Method | Route | Description |
 |---|---|---|
-| GET | `/health` | Server, MongoDB, and Redis status |
+| GET | `/health` | Server, MongoDB, Redis, and aggregate click-worker queue/failure metrics |
 
 ---
 
 ## Security Notes
 
 - Session cookies are `httpOnly`, and `secure` + `sameSite: 'none'` in production to support a split frontend/backend deployment over HTTPS. `trust proxy` is enabled in production so this works correctly behind a reverse-proxy host (Railway, Render, etc.).
+- Unsafe requests require the configured frontend `Origin`; requests without an origin or from another origin are rejected. The Razorpay webhook is the only exemption and must pass raw-body HMAC verification.
 - Passwords and OTPs are hashed (bcrypt and SHA-256 respectively) before being stored — never in plaintext.
 - Password-protected links only cache their `hasPassword` flag in Redis, never the hash itself — password verification always checks against MongoDB directly.
 - All rate limiters are Redis-backed, so limits hold correctly across restarts and multiple server instances.
@@ -498,12 +511,7 @@ Ideas being considered for future contributions:
 
 ## Contributing
 
-Contributions are welcome. Please open an issue to discuss significant changes before submitting a pull request.
-
-1. Fork the repo
-2. Create a feature branch (`git checkout -b feature/your-feature`)
-3. Commit your changes
-4. Push and open a pull request
+See [CONTRIBUTING.md](CONTRIBUTING.md) for local setup, branch conventions, validation commands, pull-request expectations, and security-reporting guidance.
 
 ---
 

@@ -3,6 +3,8 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
+import Link from "next/link";
+import { AuthSkeleton } from "@/components/LoadingSkeleton";
 
 export default function LoginPage() {
   const [form, setForm] = useState({ email: "", password: "" });
@@ -55,68 +57,55 @@ export default function LoginPage() {
   };
 
   if (authLoading || user) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-ink">
-        <p className="text-text-muted text-sm">Loading...</p>
-      </div>
-    );
+    return <AuthSkeleton label="Checking your session" />;
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-ink px-4">
+      <div className="flex min-h-screen items-center justify-center bg-[#000000] px-5 py-12">
       <form
         onSubmit={handleSubmit}
-        className="bg-surface border border-white/10 p-8 rounded-xl w-full max-w-sm space-y-5"
+        className="w-full max-w-md space-y-6 rounded-2xl border border-white/10 bg-[#181818] p-6 shadow-2xl sm:p-8"
       >
         <div>
-          <p className="text-xs uppercase tracking-widest text-wire font-mono mb-1">
-            Sign in
-          </p>
-          <h1 className="text-2xl font-display font-bold text-white">
-            Welcome back
-          </h1>
+          <p className="mb-2 text-sm text-[#777777]">Your links are waiting.</p>
+          <h1 className="font-display text-3xl font-semibold tracking-tight text-white">Sign in</h1>
+          <p className="mt-2 text-sm leading-6 text-[#9B9B9B]">Continue to your links, analytics, and bio pages.</p>
         </div>
 
         {error && (
-          <p className="text-sm text-danger bg-danger/10 border border-danger/30 rounded-md px-3 py-2">
+          <p className="rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger" role="alert" aria-live="assertive">
             {error}
           </p>
         )}
 
-        <div className="space-y-3">
-          <input
+        <div className="space-y-4">
+          <label className="block text-sm font-medium text-white">Email<input
             name="email"
             type="email"
-            placeholder="Email"
+            autoComplete="email"
+            placeholder="you@example.com"
             value={form.email}
             onChange={handleChange}
-            className="w-full bg-surface-raised border border-white/10 rounded-md px-3 py-2.5 text-white placeholder:text-text-muted focus:outline-none focus:border-signal transition-colors"
+            className="ui-input focus-ring mt-2"
             required
-          />
-          <input
-            name="password"
-            type="password"
-            placeholder="Password"
-            value={form.password}
-            onChange={handleChange}
-            className="w-full bg-surface-raised border border-white/10 rounded-md px-3 py-2.5 text-white placeholder:text-text-muted focus:outline-none focus:border-signal transition-colors"
-            required
-          />
+          /></label>
+          <label className="block text-sm font-medium text-white">Password<input name="password" type="password" autoComplete="current-password" placeholder="Enter your password" value={form.password} onChange={handleChange} className="ui-input focus-ring mt-2" required /></label>
         </div>
 
         <button
           type="submit"
           disabled={loading}
-          className="w-full bg-signal text-ink font-display font-medium rounded-md py-2.5 hover:brightness-110 transition disabled:opacity-50"
+          aria-busy={loading}
+          className="ui-button-primary focus-ring w-full"
         >
           {loading ? "Signing in..." : "Sign in"}
         </button>
 
         <p className="text-sm text-text-muted text-center">
           No account?{" "}
-          <a href="/signup" className="text-wire hover:underline">
+          <Link href="/signup" className="text-wire hover:underline">
             Create one
-          </a>
+          </Link>
         </p>
       </form>
     </div>

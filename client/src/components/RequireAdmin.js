@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
+import { PageSkeleton } from "@/components/LoadingSkeleton";
 
 export default function RequireAdmin(props) {
   var authState = useAuth();
@@ -22,11 +23,7 @@ export default function RequireAdmin(props) {
   );
 
   if (authState.loading || !authState.user || !authState.user.isAdmin) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-ink">
-        <p className="text-text-muted text-sm">Loading...</p>
-      </div>
-    );
+    return <PageSkeleton label="Checking administrator access" />;
   }
 
   return props.children;

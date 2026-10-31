@@ -31,6 +31,20 @@ const userSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
+userSchema.index({ createdAt: -1 }, { name: "query_created_at_desc" });
+userSchema.index(
+  { razorpaySubscriptionId: 1 },
+  { name: "query_subscription_id" },
+);
+userSchema.index(
+  { currentPeriodEnd: -1 },
+  { name: "query_period_end_desc" },
+);
+userSchema.index(
+  { plan: 1, currentPeriodEnd: -1 },
+  { name: "query_plan_period_end_desc" },
+);
+
 // Hash password before save
 userSchema.pre("save", async function () {
   if (!this.isModified("password")) return;

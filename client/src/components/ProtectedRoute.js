@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
+import { PageSkeleton } from "@/components/LoadingSkeleton";
 
 export default function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
@@ -14,12 +15,7 @@ export default function ProtectedRoute({ children }) {
     }
   }, [loading, user, router]);
 
-  if (loading)
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        Loading...
-      </div>
-    );
+  if (loading) return <PageSkeleton label="Checking your session" />;
   if (!user) return null;
 
   return children;

@@ -20,31 +20,30 @@ import {
 } from "recharts";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import Navbar from "@/components/Navbar";
+import Icon from "@/components/Icon";
 import api from "@/lib/api";
+import { SkeletonBlock } from "@/components/LoadingSkeleton";
 
-var PIE_COLORS = ["#F5A623", "#7C6FF0", "#34D399", "#F87171", "#60A5FA"];
+var PIE_COLORS = ["#F1B84B", "#B5A2F6", "#53CFA2", "#F17F79", "#60A5FA"];
 
 function StatCard(props) {
   return (
-    <div className="bg-surface border border-white/10 rounded-lg p-4">
-      <p className="text-xs uppercase tracking-wide text-text-muted font-mono">
-        {props.label}
-      </p>
-      <p className="text-2xl font-display font-bold text-white mt-1">
-        {props.value}
-      </p>
-    </div>
+    <dl className="bg-surface border border-white/10 rounded-xl p-4">
+      <dt className="text-sm text-text-muted">{props.label}</dt>
+      <dd className="mt-2 wrap-break-word font-display text-2xl font-semibold text-white sm:text-3xl">{props.value}</dd>
+    </dl>
   );
 }
 
 function ChartCard(props) {
+  var headingId = "chart-" + props.title.toLowerCase().replace(/[^a-z0-9]+/g, "-");
   return (
-    <div className="bg-surface border border-white/10 rounded-lg p-5">
-      <h2 className="text-sm font-display font-medium text-white mb-4">
+    <section className="bg-surface border border-white/10 rounded-xl p-5" aria-labelledby={headingId}>
+      <h2 id={headingId} className="mb-4 text-base font-display font-semibold text-white">
         {props.title}
       </h2>
       {props.isEmpty ? (
-        <div className="h-55 flex items-center justify-center">
+        <div className="flex h-55 items-center justify-center px-4 text-center">
           <p className="text-sm text-text-muted">
             No data yet — check back after a few clicks.
           </p>
@@ -52,8 +51,13 @@ function ChartCard(props) {
       ) : (
         props.children
       )}
-    </div>
+    </section>
   );
+}
+
+function formatChartDate(value) {
+  var date = new Date(value + "T00:00:00");
+  return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
 function CustomTooltip(props) {
@@ -75,18 +79,31 @@ function CustomTooltip(props) {
 
 function AnalyticsSkeleton() {
   return (
-    <div className="max-w-5xl mx-auto px-4 py-8 space-y-8 animate-pulse">
-      <div className="h-6 w-40 bg-surface rounded" />
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="h-20 bg-surface rounded-lg" />
-        <div className="h-20 bg-surface rounded-lg" />
-        <div className="h-20 bg-surface rounded-lg" />
+    <div className="mx-auto max-w-5xl space-y-8 px-5 py-8 sm:px-8" role="status" aria-label="Loading link analytics" aria-busy="true">
+      <div className="flex items-center justify-between gap-4">
+        <SkeletonBlock className="h-7 w-40" />
+        <SkeletonBlock className="h-10 w-28 rounded-md" />
       </div>
-      <div className="h-64 bg-surface rounded-lg" />
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-        <div className="h-56 bg-surface rounded-lg" />
-        <div className="h-56 bg-surface rounded-lg" />
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <SkeletonBlock className="h-24 w-full rounded-xl" />
+        <SkeletonBlock className="h-24 w-full rounded-xl" />
+        <SkeletonBlock className="h-24 w-full rounded-xl" />
       </div>
+      <div className="space-y-4 rounded-xl border border-white/10 bg-surface p-5">
+        <SkeletonBlock className="h-5 w-40" />
+        <SkeletonBlock className="h-60 w-full rounded-lg" />
+      </div>
+      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+        <div className="space-y-4 rounded-xl border border-white/10 bg-surface p-5">
+          <SkeletonBlock className="h-5 w-36" />
+          <SkeletonBlock className="h-52 w-full rounded-lg" />
+        </div>
+        <div className="space-y-4 rounded-xl border border-white/10 bg-surface p-5">
+          <SkeletonBlock className="h-5 w-36" />
+          <SkeletonBlock className="h-52 w-full rounded-lg" />
+        </div>
+      </div>
+      <SkeletonBlock className="h-56 w-full rounded-xl" />
     </div>
   );
 }
@@ -97,6 +114,8 @@ function AnalyticsContent() {
   var [loading, setLoading] = useState(true);
   var [error, setError] = useState("");
   var [exporting, setExporting] = useState(false);
+  var [exportFeedback, setExportFeedback] = useState("");
+  var [exportFailed, setExportFailed] = useState(false);
 
   useEffect(
     function () {
@@ -117,12 +136,24 @@ function AnalyticsContent() {
 
   var handleExportCsv = async function () {
     setExporting(true);
+    setExportFeedback("");
+    setExportFailed(false);
     try {
-      var res = await api.get("/analytics/" + params.id + "/events");
-      var events = res.data.events;
+      var events = [];
+      var page = 1;
+      var pages = 1;
+
+      do {
+        var res = await api.get("/analytics/" + params.id + "/events", {
+          params: { page: page },
+        });
+        events = events.concat(res.data.events);
+        pages = res.data.pages || 1;
+        page += 1;
+      } while (page <= pages);
 
       if (events.length === 0) {
-        alert("No click events to export yet.");
+        setExportFeedback("No click events are available to export yet.");
         return;
       }
 
@@ -146,10 +177,14 @@ function AnalyticsContent() {
       link.href = url;
       link.download = res.data.shortCode + "-clicks.csv";
       link.click();
-      URL.revokeObjectURL(url);
+      window.setTimeout(function () {
+        URL.revokeObjectURL(url);
+      }, 1000);
+      setExportFeedback("CSV download started.");
     } catch (err) {
       console.error(err);
-      alert("Export failed");
+      setExportFailed(true);
+      setExportFeedback("CSV export failed. Try again.");
     } finally {
       setExporting(false);
     }
@@ -160,7 +195,7 @@ function AnalyticsContent() {
   if (error || !data) {
     return (
       <div className="max-w-5xl mx-auto px-4 py-16 text-center">
-        <p className="text-danger">{error || "No data found"}</p>
+        <p className="text-danger" role="alert">{error || "No data found"}</p>
         <Link
           href="/dashboard"
           className="text-wire hover:underline text-sm mt-3 inline-block"
@@ -177,28 +212,26 @@ function AnalyticsContent() {
     data.topCountries.length > 0 ? data.topCountries[0]._id : "—";
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-8 space-y-8">
-      <div>
-        <Link
-          href="/dashboard"
-          className="text-xs text-text-muted hover:text-wire font-mono"
-        >
+    <div className="mx-auto max-w-5xl space-y-7 px-5 py-10 sm:px-8">
+      <div className="flex flex-col gap-4 border-b border-white/10 pb-6 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+        <Link href="/dashboard" className="text-sm text-text-muted transition-colors hover:text-white">
           &larr; Back to dashboard
         </Link>
-        <h1 className="text-2xl font-display font-bold text-white mt-2">
+        <h1 className="mt-3 font-display text-3xl font-semibold tracking-tight text-white sm:text-4xl">
           Link analytics
         </h1>
+        <p className="mt-2 text-sm text-text-muted">{data.totalClicks.toLocaleString()} total clicks</p>
+        </div>
+        <div className="flex flex-col items-start gap-2 sm:items-end">
+          <button onClick={handleExportCsv} disabled={exporting} className="ui-button-secondary focus-ring inline-flex items-center gap-2 text-sm disabled:opacity-50">
+            <Icon name="download" size={16} />{exporting ? "Preparing CSV..." : "Export CSV"}
+          </button>
+          {exportFeedback ? <p className={"text-sm " + (exportFailed ? "text-danger" : "text-text-muted")} role={exportFailed ? "alert" : "status"} aria-live="polite">{exportFeedback}</p> : null}
+        </div>
       </div>
 
-      <button
-        onClick={handleExportCsv}
-        disabled={exporting}
-        className="text-sm border border-white/15 rounded-md px-3 py-1.5 text-text-muted hover:text-white hover:border-white/30 transition-colors disabled:opacity-50"
-      >
-        {exporting ? "Exporting..." : "Export CSV"}
-      </button>
-
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <StatCard label="Total clicks" value={data.totalClicks} />
         <StatCard label="Top referrer" value={topReferrer} />
         <StatCard label="Top country" value={topCountry} />
@@ -209,17 +242,18 @@ function AnalyticsContent() {
         isEmpty={data.clicksOverTime.length === 0}
       >
         <ResponsiveContainer width="100%" height={240}>
-          <LineChart data={data.clicksOverTime}>
+          <LineChart data={data.clicksOverTime} accessibilityLayer desc="Daily click count for this link.">
             <CartesianGrid stroke="rgba(255,255,255,0.06)" vertical={false} />
             <XAxis
               dataKey="_id"
-              tick={{ fill: "#8B93A7", fontSize: 11 }}
+              tickFormatter={formatChartDate}
+              tick={{ fill: "#A0AAB4", fontSize: 12 }}
               axisLine={false}
               tickLine={false}
             />
             <YAxis
               allowDecimals={false}
-              tick={{ fill: "#8B93A7", fontSize: 11 }}
+              tick={{ fill: "#A0AAB4", fontSize: 12 }}
               axisLine={false}
               tickLine={false}
             />
@@ -228,9 +262,9 @@ function AnalyticsContent() {
               type="monotone"
               dataKey="count"
               name="clicks"
-              stroke="#F5A623"
+              stroke="#F1B84B"
               strokeWidth={2}
-              dot={{ r: 3, fill: "#F5A623" }}
+              dot={{ r: 3, fill: "#F1B84B" }}
             />
           </LineChart>
         </ResponsiveContainer>
@@ -246,11 +280,13 @@ function AnalyticsContent() {
               data={data.topReferrers}
               layout="vertical"
               margin={{ left: 8 }}
+              accessibilityLayer
+              desc="Click counts by referring website."
             >
               <XAxis
                 type="number"
                 allowDecimals={false}
-                tick={{ fill: "#8B93A7", fontSize: 11 }}
+                tick={{ fill: "#A0AAB4", fontSize: 12 }}
                 axisLine={false}
                 tickLine={false}
               />
@@ -258,7 +294,7 @@ function AnalyticsContent() {
                 dataKey="_id"
                 type="category"
                 width={90}
-                tick={{ fill: "#8B93A7", fontSize: 11 }}
+                tick={{ fill: "#A0AAB4", fontSize: 12 }}
                 axisLine={false}
                 tickLine={false}
               />
@@ -269,7 +305,7 @@ function AnalyticsContent() {
               <Bar
                 dataKey="count"
                 name="clicks"
-                fill="#7C6FF0"
+                fill="#B5A2F6"
                 radius={[0, 4, 4, 0]}
               />
             </BarChart>
@@ -281,7 +317,7 @@ function AnalyticsContent() {
           isEmpty={data.deviceBreakdown.length === 0}
         >
           <ResponsiveContainer width="100%" height={200}>
-            <PieChart>
+            <PieChart accessibilityLayer desc="Distribution of clicks by device type.">
               <Pie
                 data={data.deviceBreakdown}
                 dataKey="count"
@@ -305,40 +341,42 @@ function AnalyticsContent() {
               <Tooltip content={<CustomTooltip />} />
             </PieChart>
           </ResponsiveContainer>
-          <div className="flex flex-wrap gap-3 mt-3 justify-center">
+          <ul className="mt-3 flex flex-wrap justify-center gap-x-4 gap-y-2" aria-label="Clicks by device">
             {data.deviceBreakdown.map(function (entry, index) {
               return (
-                <div
+                <li
                   key={index}
-                  className="flex items-center gap-1.5 text-xs text-text-muted"
+                  className="flex items-center gap-2 text-sm text-text-muted"
                 >
                   <span
-                    className="w-2 h-2 rounded-full"
+                    aria-hidden="true"
+                    className="h-2.5 w-2.5 shrink-0 rounded-full"
                     style={{
                       backgroundColor: PIE_COLORS[index % PIE_COLORS.length],
                     }}
                   />
-                  {entry._id}
-                </div>
+                  <span className="capitalize">{entry._id}</span>
+                  <span className="font-mono text-white">{entry.count}</span>
+                </li>
               );
             })}
-          </div>
+          </ul>
         </ChartCard>
       </div>
 
       <ChartCard title="Top countries" isEmpty={data.topCountries.length === 0}>
         <ResponsiveContainer width="100%" height={200}>
-          <BarChart data={data.topCountries}>
+          <BarChart data={data.topCountries} accessibilityLayer desc="Click counts by country.">
             <CartesianGrid stroke="rgba(255,255,255,0.06)" vertical={false} />
             <XAxis
               dataKey="_id"
-              tick={{ fill: "#8B93A7", fontSize: 11 }}
+              tick={{ fill: "#A0AAB4", fontSize: 12 }}
               axisLine={false}
               tickLine={false}
             />
             <YAxis
               allowDecimals={false}
-              tick={{ fill: "#8B93A7", fontSize: 11 }}
+              tick={{ fill: "#A0AAB4", fontSize: 12 }}
               axisLine={false}
               tickLine={false}
             />
@@ -349,7 +387,7 @@ function AnalyticsContent() {
             <Bar
               dataKey="count"
               name="clicks"
-              fill="#34D399"
+              fill="#53CFA2"
               radius={[4, 4, 0, 0]}
             />
           </BarChart>

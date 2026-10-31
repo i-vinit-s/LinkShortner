@@ -84,4 +84,9 @@ const bioPageSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
+bioPageSchema.index(
+  { userId: 1, createdAt: -1 },
+  { name: "query_user_created_at_desc" },
+);
+
 module.exports = mongoose.model("BioPage", bioPageSchema);

@@ -19,4 +19,9 @@ const reportSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
+reportSchema.index(
+  { status: 1, createdAt: -1 },
+  { name: "query_status_created_at_desc" },
+);
+
 module.exports = mongoose.model("Report", reportSchema);

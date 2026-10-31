@@ -8,14 +8,24 @@ export default function CookieBanner() {
   var [dismissed, setDismissed] = useState(true);
 
   useEffect(function () {
-    var seen = localStorage.getItem("cookie_notice_seen");
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setDismissed(!!seen);
+    try {
+      var seen = localStorage.getItem("cookie_notice_seen");
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setDismissed(!!seen);
+    } catch {
+      // Show the notice when storage is blocked; the banner still works for this visit.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setDismissed(false);
+    }
     setMounted(true);
   }, []);
 
   var handleDismiss = function () {
-    localStorage.setItem("cookie_notice_seen", "true");
+    try {
+      localStorage.setItem("cookie_notice_seen", "true");
+    } catch {
+      // Dismiss for the current visit even if persistence is unavailable.
+    }
     setDismissed(true);
   };
 

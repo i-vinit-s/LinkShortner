@@ -12,17 +12,19 @@ export default function LinkFilterBar(props) {
   var setTagFilter = props.setTagFilter;
 
   var selectClass =
-    "w-full bg-surface-raised border border-white/10 rounded-md px-3 py-2 text-sm text-white focus:outline-none focus:border-signal";
+    "focus-ring min-h-11 w-full rounded-md border border-white/10 bg-[#1F1F1F] px-3 text-sm text-white focus:border-signal focus:outline-none";
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
+      <label htmlFor="link-search" className="text-sm font-medium text-white">Find a link</label>
       <input
+        id="link-search"
         value={search}
         onChange={function (e) {
           setSearch(e.target.value);
         }}
-        placeholder="Search by URL or short code..."
-        className="w-full bg-surface-raised border border-white/10 rounded-md px-3 py-2 text-sm text-white placeholder:text-text-muted focus:outline-none focus:border-signal"
+        placeholder="Search by URL or short code"
+        className="focus-ring min-h-11 w-full rounded-md border border-white/10 bg-[#1F1F1F] px-3 text-sm text-white placeholder:text-[#777777] focus:border-signal focus:outline-none"
       />
 
       <div
@@ -34,6 +36,7 @@ export default function LinkFilterBar(props) {
         }
       >
         <select
+          aria-label="Filter by status"
           value={statusFilter}
           onChange={function (e) {
             setStatusFilter(e.target.value);
@@ -47,6 +50,7 @@ export default function LinkFilterBar(props) {
         </select>
 
         <select
+          aria-label="Sort links"
           value={sortBy}
           onChange={function (e) {
             setSortBy(e.target.value);
@@ -61,6 +65,7 @@ export default function LinkFilterBar(props) {
 
         {availableTags.length > 0 ? (
           <select
+            aria-label="Filter by tag"
             value={tagFilter}
             onChange={function (e) {
               setTagFilter(e.target.value);

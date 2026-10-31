@@ -52,5 +52,10 @@ linkSchema.set("toJSON", {
 });
 
 linkSchema.index({ userId: 1, tags: 1 });
+linkSchema.index(
+  { userId: 1, createdAt: -1 },
+  { name: "query_user_created_at_desc" },
+);
+linkSchema.index({ createdAt: -1 }, { name: "query_created_at_desc" });
 
 module.exports = mongoose.model("Link", linkSchema);

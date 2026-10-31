@@ -1,6 +1,7 @@
 const Link = require("../models/Link");
 const ClickEvent = require("../models/ClickEvent");
 const mongoose = require("mongoose");
+const { getPageBounds } = require("../utils/pagination");
 
 exports.getLinkAnalytics = async (req, res) => {
   try {
@@ -68,12 +69,23 @@ exports.getRawClickEvents = async (req, res) => {
     var link = await Link.findOne(query);
     if (!link) return res.status(404).json({ message: "Link not found" });
 
+    var limit = 1000;
+    var total = await ClickEvent.countDocuments({ linkId: link._id });
+    var pageInfo = getPageBounds(req.query.page, total, limit);
     var events = await ClickEvent.find({ linkId: link._id })
-      .sort({ timestamp: -1 })
+      .sort({ timestamp: -1, _id: -1 })
+      .skip((pageInfo.page - 1) * limit)
+      .limit(limit)
       .select("timestamp referrer device browser os country city -_id")
       .lean();
 
-    res.json({ shortCode: link.shortCode, events: events });
+    res.json({
+      shortCode: link.shortCode,
+      events: events,
+      total: total,
+      page: pageInfo.page,
+      pages: pageInfo.pages,
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Failed to fetch click events" });

@@ -2,6 +2,7 @@ const Link = require("../models/Link");
 const redisClient = require("../config/redis");
 const UAParser = require("ua-parser-js");
 const geoip = require("geoip-lite");
+const crypto = require("crypto");
 
 // Called by the frontend page — returns JSON instead of doing a raw redirect
 exports.resolveLink = async (req, res) => {
@@ -123,6 +124,7 @@ async function trackClick(shortCode, req) {
   const geo = geoip.lookup(ip);
 
   const event = {
+    _id: crypto.randomBytes(12).toString("hex"),
     shortCode,
     timestamp: Date.now(),
     referrer: pickReferrer(req),

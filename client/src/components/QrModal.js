@@ -2,13 +2,16 @@
 
 import { useState, useEffect } from "react";
 import api from "@/lib/api";
+import { SkeletonBlock } from "@/components/LoadingSkeleton";
 
 export default function QrModal({ linkId, onClose }) {
   const [qrDataUrl, setQrDataUrl] = useState(null);
   const [shortUrl, setShortUrl] = useState("");
   const [shortCode, setShortCode] = useState("");
   const [loading, setLoading] = useState(true);
+  const [retryKey, setRetryKey] = useState(0);
   const [copied, setCopied] = useState(false);
+  const [copyError, setCopyError] = useState(false);
 
   useEffect(() => {
     const loadQr = async () => {
@@ -24,7 +27,7 @@ export default function QrModal({ linkId, onClose }) {
       }
     };
     loadQr();
-  }, [linkId]);
+  }, [linkId, retryKey]);
 
   const handleDownload = function () {
     const a = document.createElement("a");
@@ -34,26 +37,35 @@ export default function QrModal({ linkId, onClose }) {
   };
 
   const handleCopy = async function () {
-    await navigator.clipboard.writeText(shortUrl);
-    setCopied(true);
-    setTimeout(function () {
-      setCopied(false);
-    }, 1500);
+    setCopyError(false);
+    try {
+      await navigator.clipboard.writeText(shortUrl);
+      setCopied(true);
+      setTimeout(function () {
+        setCopied(false);
+      }, 1500);
+    } catch {
+      setCopyError(true);
+    }
   };
 
   return (
     <div
       className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
       onClick={onClose}
+      role="presentation"
     >
       <div
         className="bg-surface border border-white/10 rounded-xl p-6 max-w-sm w-full text-center space-y-5 shadow-2xl"
         onClick={function (e) {
           e.stopPropagation();
         }}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="qr-modal-title"
       >
         <div className="flex items-center justify-between">
-          <h2 className="font-display font-medium text-white text-sm">
+          <h2 id="qr-modal-title" className="font-display font-medium text-white text-sm">
             QR Code
           </h2>
           <button
@@ -77,9 +89,13 @@ export default function QrModal({ linkId, onClose }) {
         </div>
 
         {loading ? (
-          <div className="py-10">
-            <div className="w-8 h-8 mx-auto border-2 border-white/10 border-t-signal rounded-full animate-spin" />
-            <p className="text-text-muted text-xs mt-3">Generating...</p>
+          <div className="flex flex-col items-center gap-4 py-6" role="status" aria-label="Loading QR code" aria-busy="true">
+            <SkeletonBlock className="h-48 w-48 rounded-lg bg-white/10" />
+            <SkeletonBlock className="h-10 w-full rounded-md" />
+            <div className="flex w-full gap-2">
+              <SkeletonBlock className="h-11 flex-1 rounded-md" />
+              <SkeletonBlock className="h-11 flex-1 rounded-md" />
+            </div>
           </div>
         ) : qrDataUrl ? (
           <>
@@ -131,6 +147,11 @@ export default function QrModal({ linkId, onClose }) {
                 )}
               </button>
             </div>
+            {copyError ? (
+              <p className="text-left text-xs text-danger" role="alert">
+                Clipboard access was unavailable. You can select and copy the link above.
+              </p>
+            ) : null}
 
             <div className="flex gap-2">
               <button
@@ -149,7 +170,16 @@ export default function QrModal({ linkId, onClose }) {
           </>
         ) : (
           <div className="py-8 space-y-3">
-            <p className="text-danger text-sm">Failed to load QR code</p>
+            <p className="text-danger text-sm" role="alert">Failed to load QR code</p>
+            <button
+              onClick={function () {
+                setLoading(true);
+                setRetryKey(function (key) { return key + 1; });
+              }}
+              className="text-sm bg-signal px-4 py-2 rounded-md font-medium text-ink hover:brightness-110"
+            >
+              Try again
+            </button>
             <button
               onClick={onClose}
               className="text-sm border border-white/15 text-text-muted rounded-md px-4 py-2 hover:text-white hover:border-white/30 transition-colors"

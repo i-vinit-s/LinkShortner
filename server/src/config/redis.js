@@ -6,7 +6,16 @@ redisClient.on("error", (err) => console.error("Redis error:", err));
 redisClient.on("connect", () => console.log("Redis connected"));
 
 (async () => {
-  await redisClient.connect();
+  try {
+    await redisClient.connect();
+  } catch (err) {
+    console.error("Redis connection failed:", err.message);
+  }
 })();
 
+async function disconnectRedis() {
+  if (redisClient.isOpen) await redisClient.quit();
+}
+
 module.exports = redisClient;
+module.exports.disconnectRedis = disconnectRedis;
